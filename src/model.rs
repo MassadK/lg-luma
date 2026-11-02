@@ -212,9 +212,20 @@ impl DateFormat {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum InterfaceStyle {
+    Original,
+    #[default]
+    LiquidGlass,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Preferences {
+    pub interface_style: InterfaceStyle,
+    /// Surface opacity scale: 0 = Crystal, 100 = Frosted.
+    pub glass_transparency: u8,
     pub favorites: Option<Vec<String>>,
     pub custom_tiles: Vec<CustomTile>,
     pub hidden: Vec<String>,
@@ -256,6 +267,8 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            interface_style: InterfaceStyle::default(),
+            glass_transparency: 55,
             favorites: None,
             custom_tiles: vec![],
             hidden: vec![],
@@ -376,6 +389,7 @@ impl Preferences {
     }
 
     pub fn sanitize(&mut self) {
+        self.glass_transparency = ((self.glass_transparency.min(100) as u16 + 2) / 5 * 5) as u8;
         if self.splash_background.as_ref().is_some_and(|id| {
             !BACKGROUNDS.iter().any(|(known, _)| *known == id) && !crate::wallpapers::valid_id(id)
         }) {

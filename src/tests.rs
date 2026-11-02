@@ -17,7 +17,10 @@ mod wallpaper_tests;
 mod input_refresh_tests;
 
 fn ready() -> State {
-    let mut state = State::new(Preferences::default());
+    let mut state = State::new(Preferences {
+        interface_style: crate::model::InterfaceStyle::Original,
+        ..Preferences::default()
+    });
     state.set_inventory(demo_inventory(), None);
     state
 }
@@ -932,6 +935,8 @@ fn system_category_owns_refresh_and_quit_and_restores_sidebar_focus() {
     assert_eq!(state.activate(), vec![Effect::Quit]);
     state.back();
     assert_eq!(state.focus, Target::Sidebar(crate::state::SYSTEM_SECTION));
+    state.direction(Direction::Down, &controls(&state));
+    assert_eq!(state.focus, Target::Sidebar(4));
     state.direction(Direction::Down, &controls(&state));
     assert_eq!(state.focus, Target::Sidebar(0));
     assert_eq!(state.section, 0);
@@ -2356,7 +2361,7 @@ fn widgets_group_existing_settings_and_restore_each_parent_without_changing_pref
     }]);
     let saved = serde_json::to_value(&state.preferences).unwrap();
     state.open(2);
-    assert_eq!(SECTION_COUNT, 4);
+    assert_eq!(SECTION_COUNT, 5);
     assert!(
         !controls(&state)
             .iter()
@@ -2450,7 +2455,7 @@ fn widgets_are_localized_without_legacy_sidebar_entries() {
                 .iter()
                 .filter(|c| matches!(c.target, Target::Sidebar(_)))
                 .count(),
-            4
+            5
         );
         assert_eq!(
             page.controls
@@ -2971,98 +2976,6 @@ fn date_formats_preserve_localized_default_and_pad_numeric_dates() {
 }
 
 #[test]
-fn update_card_shows_both_versions_and_explicitly_starts_installation() {
-    use crate::{i18n::Language, renderer::Draw};
-    for language in Language::ALL {
-        let mut state = ready();
-        state.preferences.language = language;
-        state.open(2);
-        state.section = crate::state::SYSTEM_SECTION;
-        assert!(
-            !controls(&state)
-                .iter()
-                .any(|control| control.target == Target::InstallUpdate)
-        );
-        state.available_update = Some("9.0.0".into());
-        let rendered = scene(&state);
-        for label in [
-            language.t("updateAvailable").to_owned(),
-            language.format("installUpdate", &[("version", "9.0.0")]),
-            language.format(
-                "updateVersions",
-                &[("current", "test"), ("latest", "9.0.0")],
-            ),
-        ] {
-            assert!(
-                rendered
-                    .draw
-                    .iter()
-                    .any(|draw| matches!(draw, Draw::Text(text, ..) if text == &label))
-            );
-        }
-        state.focus = Target::Sidebar(crate::state::SYSTEM_SECTION);
-        state.direction(Direction::Right, &rendered.controls);
-        assert_eq!(state.focus, Target::InstallUpdate);
-        assert_eq!(
-            state.activate(),
-            vec![Effect::UpdateDownload("9.0.0".into())]
-        );
-        let button = rendered
-            .controls
-            .iter()
-            .find(|control| control.target == Target::InstallUpdate)
-            .unwrap();
-        let (x, y) = button.rect.center();
-        assert_eq!(
-            state.hit_test(&rendered.controls, x, y),
-            Some(Target::InstallUpdate)
-        );
-        state.direction(Direction::Down, &rendered.controls);
-        assert_eq!(state.focus, Target::Setting(3));
-        state.focus = Target::InstallUpdate;
-        state.direction(Direction::Left, &rendered.controls);
-        assert_eq!(state.focus, Target::Sidebar(crate::state::SYSTEM_SECTION));
-    }
-}
-
-#[test]
-fn update_status_card_only_claims_latest_after_success_and_allows_single_flight_retry() {
-    use crate::{renderer::Draw, update::Status};
-    let mut state = ready();
-    state.open(2);
-    state.section = crate::state::SYSTEM_SECTION;
-    state.focus = Target::CheckUpdates;
-    assert_eq!(state.update_status, Status::Unchecked);
-    assert!(!scene(&state).draw.iter().any(|draw| matches!(draw,
-        Draw::Text(label, ..) if label == state.preferences.language.t("latestVersionInstalled")
-    )));
-    assert!(state.activate().is_empty());
-    assert_eq!(state.update_status, Status::Checking);
-    assert!(std::mem::take(&mut state.update_check_requested));
-    state.activate();
-    assert!(!state.update_check_requested);
-    state.update_response(Err("offline".into()));
-    assert_eq!(state.update_status, Status::Failed);
-    assert!(!scene(&state).draw.iter().any(|draw| matches!(draw,
-        Draw::Text(label, ..) if label == state.preferences.language.t("latestVersionInstalled")
-    )));
-    state.activate();
-    assert!(std::mem::take(&mut state.update_check_requested));
-    state.update_response(Ok(None));
-    assert_eq!(state.update_status, Status::Checked);
-    for key in ["latestVersionInstalled", "checkAgain"] {
-        assert!(scene(&state).draw.iter().any(|draw| matches!(draw,
-            Draw::Text(label, ..) if label == state.preferences.language.t(key)
-        )));
-    }
-    state.activate();
-    state.update_response(Ok(Some("9.0.0".into())));
-    assert_eq!(state.focus, Target::InstallUpdate);
-    state.update_response(Err("offline".into()));
-    assert_eq!(state.available_update.as_deref(), Some("9.0.0"));
-}
-
-#[test]
 fn shortcut_tiles_keep_apps_options_and_never_launch_or_uninstall_a_platform_app() {
     let tile = crate::model::CustomTile {
         id: "custom.lamp".into(),
@@ -3203,69 +3116,71 @@ fn tiles_edited_elsewhere_join_and_leave_home_like_tv_edits() {
 }
 
 #[test]
-fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
-    use crate::update::{InstallStatus, Response, Status};
+fn glass_mode_remote_controls_clamp_and_keep_saved_values() {
+    use crate::model::InterfaceStyle;
     let mut state = ready();
-    state.open(2);
-    state.section = crate::state::SYSTEM_SECTION;
-    state.focus = Target::CheckUpdates;
-    assert!(state.activate().is_empty());
-    assert_eq!(state.update_status, Status::Checking);
-    assert!(
-        state.activate().is_empty(),
-        "no second check while one runs"
-    );
-    state.update_response(Ok(Some("9.9.9".into())));
-    assert!(scene(&state).draw.iter().any(|draw| {
-        matches!(draw, crate::renderer::Draw::Text(text, ..) if text == "Install 9.9.9")
-    }));
-    let initial = scene(&state);
-    assert!(
-        !initial
-            .controls
-            .iter()
-            .any(|control| control.target == Target::Setting(8))
-    );
+    state.preferences.interface_style = InterfaceStyle::LiquidGlass;
+    state.page = Page::Settings;
+    state.section = crate::state::APPEARANCE_SECTION;
+    state.focus = Target::GlassTransparency;
+    assert_eq!(state.preferences.glass_transparency, 55);
+    assert_eq!(state.direction(Direction::Left, &[]), vec![Effect::Save]);
+    assert_eq!(state.preferences.glass_transparency, 50);
+    for _ in 0..25 {
+        state.direction(Direction::Right, &[]);
+    }
+    assert_eq!(state.preferences.glass_transparency, 100);
+    for _ in 0..25 {
+        state.direction(Direction::Left, &[]);
+    }
+    assert_eq!(state.preferences.glass_transparency, 0);
+    state.focus = Target::GlassPreset(55);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    state.focus = Target::InterfaceStyle;
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert_eq!(state.preferences.interface_style, InterfaceStyle::Original);
+    state.direction(Direction::Down, &[]);
     assert_eq!(
-        state.activate(),
-        vec![Effect::UpdateDownload("9.9.9".into())]
+        state.focus,
+        Target::InterfaceStyle,
+        "hidden glass controls cannot receive remote focus"
     );
-    assert_eq!(state.update, InstallStatus::Downloading(0));
-    assert!(state.activate().is_empty());
-    state.install_response(Response::Progress(45));
-    assert!(scene(&state).draw.iter().any(|draw| {
-        matches!(draw, crate::renderer::Draw::Text(text, ..) if text == "Downloading 45 %")
-    }));
-    let geometry = |items: Vec<crate::state::Control>| {
-        items
-            .into_iter()
-            .map(|item| {
-                (
-                    item.target,
-                    item.rect.x,
-                    item.rect.y,
-                    item.rect.w,
-                    item.rect.h,
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(
-        geometry(controls(&state)),
-        geometry(initial.controls),
-        "progress must not move hit targets"
-    );
-    state.install_response(Response::Installing("9.9.9".into()));
-    assert!(state.activate().is_empty());
-    state.pressed = Some(Target::InstallUpdate);
-    state.install_response(Response::Finished(Err("disk full".into())));
-    assert_eq!(state.focus, Target::CheckUpdates);
-    assert!(state.pressed.is_none());
-    assert!(state.available_update.is_none());
-    assert!(!state.update_busy());
+    assert_eq!(state.preferences.glass_transparency, 55);
+    let bytes = serde_json::to_vec(&state.preferences).unwrap();
+    let restored: Preferences = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(restored.interface_style, InterfaceStyle::Original);
+    assert_eq!(restored.glass_transparency, 55);
     state.activate();
-    assert_eq!(state.update_status, Status::Checking);
-    assert_eq!(state.update, InstallStatus::Idle);
-    state.install_response(Response::Finished(Ok(())));
-    assert_eq!(state.update_status, Status::Unchecked);
+    assert_eq!(
+        state.preferences.interface_style,
+        InterfaceStyle::LiquidGlass
+    );
+}
+
+#[test]
+fn glass_preferences_sanitize_invalid_opacity() {
+    for (input, expected) in [(255, 100), (54, 55), (2, 0), (3, 5)] {
+        let mut prefs = Preferences {
+            glass_transparency: input,
+            ..Preferences::default()
+        };
+        prefs.sanitize();
+        assert_eq!(prefs.glass_transparency, expected);
+    }
+    let old: Preferences = serde_json::from_str("{}").unwrap();
+    assert_eq!(old.glass_transparency, 55);
+}
+
+#[test]
+fn standalone_never_starts_an_upstream_installer() {
+    let mut state = ready();
+    state.available_update = Some("99.0.0".into());
+    for target in [Target::InstallUpdate, Target::CheckUpdates] {
+        state.focus = target;
+        assert!(state.activate().is_empty());
+        assert!(!state.update_check_requested);
+        assert!(state.notice.as_ref().unwrap().0.contains("disabled"));
+    }
+    assert!(!crate::platform::can_uninstall("com.ecklf.luma"));
+    assert!(!crate::platform::can_uninstall("com.lumaglass.launcher"));
 }

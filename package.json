@@ -1,6 +1,6 @@
 {
   "name": "lg-luma",
-  "version": "2.16.2",
+  "version": "0.1.0",
   "private": true,
   "description": "A modern, remote-first webOS launcher.",
   "license": "MIT",
@@ -13,9 +13,9 @@
   "scripts": {
     "dev": "cargo run --locked --",
     "build": "sh tools/build-webos.sh",
-    "package": "pnpm assets && pnpm build && node tools/package.mjs && node tools/repository.mjs",
+    "package": "pnpm assets && pnpm build && node tools/package.mjs",
     "deploy": "pnpm run package && node tools/deploy.mjs",
-    "test": "pnpm test:release && pnpm test:home && pnpm test:icons && pnpm test:wallpapers && pnpm test:tiles && cargo test --locked --workspace --all-features",
+    "test": "cargo test --locked --workspace && node --test tests/standalone.test.mjs",
     "test:release": "node --test tests/release.test.mjs",
     "test:home": "node --test tests/self-update.test.mjs tests/home-wrapper.test.mjs && cargo test --locked -p luma-tv-helper",
     "test:icons": "node --test tests/brand-assets.test.mjs",
@@ -40,7 +40,9 @@
     "changeset": "changeset",
     "version:release": "changeset version && pnpm version:sync && oxfmt --write CHANGELOG.md",
     "version:sync": "node tools/sync-version.mjs",
-    "version:check": "node tools/sync-version.mjs --check"
+    "version:check": "node tools/sync-version.mjs --check",
+    "test:glass": "node tools/glass-smoke.mjs",
+    "screenshots:glass": "node tools/glass-captures.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

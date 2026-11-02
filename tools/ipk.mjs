@@ -52,6 +52,23 @@ export function normalizeAndVerifyPackage(bytes, manifest) {
     throw new Error('Incomplete IPK.');
   const tar = gunzipSync(member.data);
   const files = entries(tar);
+  // Standalone fork: no maintainer hooks, foreign application payloads or links.
+  const controlEntries = entries(gunzipSync(archive.find((e) => e.name === 'control.tar.gz').data));
+  if (controlEntries.some((e) => e.name.replace(/^\.\//, '') !== 'control'))
+    throw new Error('Standalone IPK must not contain installation lifecycle scripts.');
+  const allowedParents = ['usr', 'usr/palm', 'usr/palm/applications', 'usr/palm/packages'];
+  for (const file of files) {
+    const name = file.name.replace(/^\.\//, '').replace(/\/$/, '');
+    if (
+      name.split('/').includes('..') ||
+      (!allowedParents.includes(name) &&
+        !name.startsWith(`usr/palm/applications/${manifest.id}/`) &&
+        !name.startsWith(`usr/palm/packages/${manifest.id}/`) &&
+        name !== `usr/palm/applications/${manifest.id}` &&
+        name !== `usr/palm/packages/${manifest.id}`)
+    )
+      throw new Error(`Foreign payload path in standalone IPK: ${name}`);
+  }
   const owned = files.filter((file) => file.name.split('/').includes(manifest.id));
   if (!owned.length) throw new Error('The IPK contains no Luma app directory.');
   if (

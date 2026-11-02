@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 
 pub const WIDGETS_SECTION: usize = 2;
 pub const SYSTEM_SECTION: usize = 3;
-pub const SECTION_COUNT: usize = 4;
+pub const SECTION_COUNT: usize = 5;
+pub const APPEARANCE_SECTION: usize = 4;
 pub const SETTINGS_BOTTOM_PADDING: f32 = 64.;
 pub const SETTINGS_LIST_BOTTOM_PADDING: f32 = 48.;
 pub const APPS_COLUMNS: usize = 6;
@@ -44,6 +45,9 @@ pub enum Page {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum Target {
+    InterfaceStyle,
+    GlassTransparency,
+    GlassPreset(u8),
     Nav(usize),
     TvSettings,
     InstallUpdate,
@@ -197,6 +201,7 @@ pub enum Effect {
     FireWebhook(CustomTile),
     Quit,
     Weather(weather::Command),
+    #[allow(dead_code)] // Retained worker protocol; no standalone UI action can install.
     UpdateDownload(String),
 }
 
@@ -326,15 +331,6 @@ impl State {
             }
         }
         self.dirty = true;
-    }
-
-    pub fn update_busy(&self) -> bool {
-        self.update_status == crate::update::Status::Checking
-            || matches!(
-                self.update,
-                crate::update::InstallStatus::Downloading(_)
-                    | crate::update::InstallStatus::Installing(_)
-            )
     }
 
     pub fn install_response(&mut self, response: crate::update::Response) {
@@ -975,6 +971,7 @@ impl State {
                     })
                     .unwrap_or(0),
             ),
+            APPEARANCE_SECTION => Target::InterfaceStyle,
             WIDGETS_SECTION => Target::Widget(4),
             SYSTEM_SECTION if self.available_update.is_some() => Target::InstallUpdate,
             SYSTEM_SECTION => Target::CheckUpdates,
@@ -1034,6 +1031,52 @@ impl State {
         if self.recents_open() {
             return self.recent_direction(direction);
         }
+        if self.page == Page::Settings
+            && self.section == APPEARANCE_SECTION
+            && self.overlay.is_none()
+            && !matches!(
+                self.focus,
+                Target::Nav(_) | Target::Sidebar(_) | Target::TvSettings
+            )
+        {
+            use crate::model::InterfaceStyle;
+            if self.focus == Target::GlassTransparency
+                && matches!(direction, Direction::Left | Direction::Right)
+            {
+                self.preferences.glass_transparency = match direction {
+                    Direction::Left => self.preferences.glass_transparency.saturating_sub(5),
+                    _ => (self.preferences.glass_transparency + 5).min(100),
+                };
+                return vec![Effect::Save];
+            }
+            if self.focus == Target::InterfaceStyle && matches!(direction, Direction::Right) {
+                return self.activate();
+            }
+            let rows = [
+                Target::InterfaceStyle,
+                Target::GlassTransparency,
+                Target::GlassPreset(0),
+                Target::GlassPreset(55),
+                Target::GlassPreset(100),
+            ];
+            let count = if self.preferences.interface_style == InterfaceStyle::Original {
+                1
+            } else {
+                rows.len()
+            };
+            let index = rows.iter().position(|t| *t == self.focus).unwrap_or(0);
+            match direction {
+                Direction::Left => self.focus(Target::Sidebar(APPEARANCE_SECTION), controls),
+                Direction::Up if index == 0 => self.focus(Target::Nav(2), controls),
+                Direction::Up => self.focus(rows[index - 1].clone(), controls),
+                Direction::Down if index + 1 < count => {
+                    self.focus(rows[index + 1].clone(), controls)
+                }
+                _ => {}
+            }
+            return vec![];
+        }
+
         if matches!(self.overlay, Some(Overlay::SystemKeyboard)) {
             // The TV keyboard owns its arrows until Done/Back dismisses it.
             return vec![];
@@ -1941,6 +1984,25 @@ impl State {
             return self.send_tile(tile);
         }
         match self.focus.clone() {
+            Target::InterfaceStyle => {
+                use crate::model::InterfaceStyle;
+                self.preferences.interface_style = match self.preferences.interface_style {
+                    InterfaceStyle::Original => InterfaceStyle::LiquidGlass,
+                    InterfaceStyle::LiquidGlass => InterfaceStyle::Original,
+                };
+                self.dirty = true;
+                return vec![Effect::Save];
+            }
+            Target::GlassTransparency => {
+                self.preferences.glass_transparency =
+                    (self.preferences.glass_transparency + 5).min(100);
+                return vec![Effect::Save];
+            }
+            Target::GlassPreset(value) => {
+                self.preferences.glass_transparency = value.min(100);
+                self.dirty = true;
+                return vec![Effect::Save];
+            }
             Target::Nav(index) => self.open(index),
             Target::Browse => self.open(1),
             Target::Retry => return vec![Effect::Reload],
@@ -2086,22 +2148,9 @@ impl State {
                     self.panel_started = Some(Instant::now());
                 }
             }
-            Target::InstallUpdate => {
-                if !self.update_busy()
-                    && let Some(version) = &self.available_update
-                {
-                    let version = version.clone();
-                    self.update = crate::update::InstallStatus::Downloading(0);
-                    return vec![Effect::UpdateDownload(version)];
-                }
-            }
-            Target::CheckUpdates => {
-                if !self.update_busy() {
-                    self.update = crate::update::InstallStatus::Idle;
-                    self.update_status = crate::update::Status::Checking;
-                    self.update_check_requested = true;
-                    self.dirty = true;
-                }
+            Target::InstallUpdate | Target::CheckUpdates => {
+                self.notify("Self-update disabled. Install fork updates manually.");
+                return vec![];
             }
             Target::Tile(_) => self.options(),
             Target::TileTest(id) => {

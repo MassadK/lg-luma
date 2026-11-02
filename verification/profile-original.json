@@ -1,0 +1,596 @@
+{
+  "capture": null,
+  "damage_verify": null,
+  "display_mode": {
+    "height": 768,
+    "refresh_hz": 0,
+    "width": 1024
+  },
+  "drawable": {
+    "height": 720,
+    "width": 1280
+  },
+  "drawable_is_4k": false,
+  "graphics": {
+    "fragment_highp": true,
+    "max_texture_size": 16384,
+    "max_viewport": [16384, 16384],
+    "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "vendor": "Mesa",
+    "version": "4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.2"
+  },
+  "last_presented": {
+    "artwork_bytes": 14417460,
+    "cached_glyphs": 75,
+    "cached_text_runs": 13,
+    "cpu_submission_ms": 13.774252,
+    "draw_calls": 46,
+    "font_antialiasing": "multisample vector coverage",
+    "glyph_failures": 0,
+    "glyph_geometry_bytes": 762900,
+    "glyph_ms": 0.0,
+    "glyph_tessellations": 0,
+    "high_resolution_wallpaper": false,
+    "image_load_ms": 0.0,
+    "max_logical_font_px": 90.4000015258789,
+    "max_physical_font_px": 60.26667022705078,
+    "missing_glyphs": 0,
+    "missing_images": 0,
+    "multisample_samples": 4,
+    "redrawn_fraction": 1.0,
+    "target": {
+      "height": 720,
+      "width": 1280
+    },
+    "text_geometry_bytes": 952884,
+    "text_triangles": 8823,
+    "vector_bytes": 2118420,
+    "vector_load_ms": 0.0,
+    "vector_meshes": 10,
+    "vector_triangles": 19615,
+    "viewport": {
+      "height": 720,
+      "scale": 0.6666666865348816,
+      "width": 1280,
+      "x": 0,
+      "y": 0
+    }
+  },
+  "logical_layout": {
+    "height": 1080,
+    "width": 1920
+  },
+  "partial_redraw": null,
+  "presented_frames": 60,
+  "profile": {
+    "cpu_submission": {
+      "max_ms": 49.023362,
+      "mean_ms": 12.934183719999996,
+      "p95_ms": 28.953726999999997,
+      "samples": 50
+    },
+    "pacing": {
+      "max_ms": 49.347415,
+      "mean_ms": 13.551793899999996,
+      "p95_ms": 29.958003,
+      "samples": 50
+    },
+    "presented": 60,
+    "timeline": [
+      {
+        "compose_ms": 0.444943,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 29.535204,
+        "redrawn": 1.0,
+        "render_ms": 28.953726999999997,
+        "swap_ms": 0.016815,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.20016799999999998,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 13.983653,
+        "redrawn": 1.0,
+        "render_ms": 13.649094,
+        "swap_ms": 0.016975,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.28643599999999997,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 23.758266,
+        "redrawn": 1.0,
+        "render_ms": 23.336427999999998,
+        "swap_ms": 0.016625,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.20148,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 39.995258,
+        "redrawn": 1.0,
+        "render_ms": 39.662031,
+        "swap_ms": 0.017075000000000003,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.187359,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 23.995058999999998,
+        "redrawn": 1.0,
+        "render_ms": 23.677516,
+        "swap_ms": 0.016415000000000003,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.19114499999999998,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 23.827569999999998,
+        "redrawn": 1.0,
+        "render_ms": 23.497998,
+        "swap_ms": 0.015994,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.187499,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 49.347415,
+        "redrawn": 1.0,
+        "render_ms": 49.023362,
+        "swap_ms": 0.016344,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.203122,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 10.988491,
+        "redrawn": 1.0,
+        "render_ms": 10.656686,
+        "swap_ms": 0.015644,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.19312800000000002,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 15.133557000000001,
+        "redrawn": 1.0,
+        "render_ms": 14.811788,
+        "swap_ms": 0.015273000000000002,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.219167,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 15.031885,
+        "redrawn": 1.0,
+        "render_ms": 14.677176,
+        "swap_ms": 0.015964000000000002,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.230894,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.810517,
+        "redrawn": 1.0,
+        "render_ms": 8.449118,
+        "swap_ms": 0.016064000000000002,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.165477,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 6.949633,
+        "redrawn": 1.0,
+        "render_ms": 6.649136,
+        "swap_ms": 0.017346,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.154581,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 7.3484989999999994,
+        "redrawn": 1.0,
+        "render_ms": 7.044306000000001,
+        "swap_ms": 0.015172,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.187519,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 13.197943,
+        "redrawn": 1.0,
+        "render_ms": 12.89426,
+        "swap_ms": 0.016705,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.183403,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 5.148210000000001,
+        "redrawn": 1.0,
+        "render_ms": 4.851898,
+        "swap_ms": 0.009955,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.116493,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 17.313435,
+        "redrawn": 1.0,
+        "render_ms": 17.120338,
+        "swap_ms": 0.015744,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.162011,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 5.8039060000000005,
+        "redrawn": 1.0,
+        "render_ms": 5.530349,
+        "swap_ms": 0.012339,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.136934,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 12.158133999999999,
+        "redrawn": 1.0,
+        "render_ms": 11.922723,
+        "swap_ms": 0.012759,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.146078,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 3.6204039999999997,
+        "redrawn": 1.0,
+        "render_ms": 3.379054,
+        "swap_ms": 0.009212999999999999,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.219497,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 6.894992,
+        "redrawn": 1.0,
+        "render_ms": 6.610639,
+        "swap_ms": 0.009645,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.106849,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 2.655426,
+        "redrawn": 1.0,
+        "render_ms": 2.4561689999999996,
+        "swap_ms": 0.00703,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.084486,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 6.570099,
+        "redrawn": 1.0,
+        "render_ms": 6.439903999999999,
+        "swap_ms": 0.008612,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.111336,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.330251,
+        "redrawn": 1.0,
+        "render_ms": 8.151936000000001,
+        "swap_ms": 0.009755,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.146308,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 9.141820000000001,
+        "redrawn": 1.0,
+        "render_ms": 8.912859000000001,
+        "swap_ms": 0.010926,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.159287,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 29.958003,
+        "redrawn": 1.0,
+        "render_ms": 25.290119,
+        "swap_ms": 0.014421,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.155031,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 17.567373,
+        "redrawn": 1.0,
+        "render_ms": 17.306154,
+        "swap_ms": 0.010766,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.143103,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 10.885968,
+        "redrawn": 1.0,
+        "render_ms": 10.647412000000001,
+        "swap_ms": 0.010594999999999999,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.152658,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 11.526353,
+        "redrawn": 1.0,
+        "render_ms": 11.28259,
+        "swap_ms": 0.012659,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.171235,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 10.333675000000001,
+        "redrawn": 1.0,
+        "render_ms": 10.060529,
+        "swap_ms": 0.012518,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.18420399999999998,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 15.09505,
+        "redrawn": 1.0,
+        "render_ms": 10.749034,
+        "swap_ms": 0.014732,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.17713399999999999,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 13.438301,
+        "redrawn": 1.0,
+        "render_ms": 13.143231,
+        "swap_ms": 0.014301000000000001,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.184776,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 20.135278,
+        "redrawn": 1.0,
+        "render_ms": 19.830765,
+        "swap_ms": 0.015633,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.188972,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.051767,
+        "redrawn": 1.0,
+        "render_ms": 7.73849,
+        "swap_ms": 0.01339,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.161651,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 5.224724,
+        "redrawn": 1.0,
+        "render_ms": 4.958557,
+        "swap_ms": 0.010655999999999999,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.175381,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.861502,
+        "redrawn": 1.0,
+        "render_ms": 8.595916,
+        "swap_ms": 0.014382,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.204174,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 3.9878709999999997,
+        "redrawn": 1.0,
+        "render_ms": 3.676908,
+        "swap_ms": 0.009945,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.138005,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 7.875444000000001,
+        "redrawn": 1.0,
+        "render_ms": 7.653834,
+        "swap_ms": 0.013129,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.167159,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 7.9577659999999995,
+        "redrawn": 1.0,
+        "render_ms": 7.683948,
+        "swap_ms": 0.012649,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.171225,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 9.335778,
+        "redrawn": 1.0,
+        "render_ms": 9.057414,
+        "swap_ms": 0.011587,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.192176,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 14.891897,
+        "redrawn": 1.0,
+        "render_ms": 10.534595000000001,
+        "swap_ms": 0.015002,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.21508000000000002,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 28.752667,
+        "redrawn": 1.0,
+        "render_ms": 28.411129,
+        "swap_ms": 0.015463000000000001,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.15943700000000002,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 13.051946,
+        "redrawn": 1.0,
+        "render_ms": 12.778258000000001,
+        "swap_ms": 0.013591,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.183914,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 9.674673,
+        "redrawn": 1.0,
+        "render_ms": 9.381456,
+        "swap_ms": 0.011597999999999999,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.159277,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.092748,
+        "redrawn": 1.0,
+        "render_ms": 7.8308979999999995,
+        "swap_ms": 0.011848000000000001,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.172757,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.083023,
+        "redrawn": 1.0,
+        "render_ms": 7.802415,
+        "swap_ms": 0.010936,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.15939799999999998,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.00799,
+        "redrawn": 1.0,
+        "render_ms": 7.757047,
+        "swap_ms": 0.010034000000000001,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.153168,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 9.42408,
+        "redrawn": 1.0,
+        "render_ms": 9.178353999999999,
+        "swap_ms": 0.012719,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.183494,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 14.927330000000001,
+        "redrawn": 1.0,
+        "render_ms": 10.580734,
+        "swap_ms": 0.011968,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.188541,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 8.929072999999999,
+        "redrawn": 1.0,
+        "render_ms": 8.646652,
+        "swap_ms": 0.010125,
+        "vector_ms": 0.0
+      },
+      {
+        "compose_ms": 0.12442500000000001,
+        "glyph_ms": 0.0,
+        "image_ms": 0.0,
+        "interval_ms": 13.979788,
+        "redrawn": 1.0,
+        "render_ms": 13.774252,
+        "swap_ms": 0.012849,
+        "vector_ms": 0.0
+      }
+    ],
+    "warmup_frames": 10
+  },
+  "redrawn_fraction_mean": 1.0,
+  "requested_window": {
+    "height": 720,
+    "width": 1280
+  },
+  "text_rendering": {
+    "embolden": 0.0,
+    "mode": "msaa"
+  },
+  "window": {
+    "height": 720,
+    "width": 1280
+  }
+}

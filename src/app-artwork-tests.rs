@@ -486,6 +486,7 @@ fn grid_and_options_use_matching_adaptive_hearts_without_a_backing_circle() {
         ]))
         .unwrap();
         let mut state = crate::state::State::new(crate::model::Preferences {
+            interface_style: crate::model::InterfaceStyle::Original,
             favorites: Some(vec!["regional.app".into()]),
             reduced_motion: true,
             ..Default::default()
@@ -552,7 +553,10 @@ fn visible_cards_switch_from_fallback_to_a_single_composited_installed_surface()
     let apps =
         crate::platform::normalize_apps(&json!([{"id":"regional.app", "title":"Regional App"}]))
             .unwrap();
-    let mut state = crate::state::State::new(Default::default());
+    let mut state = crate::state::State::new(crate::model::Preferences {
+        interface_style: crate::model::InterfaceStyle::Original,
+        ..Default::default()
+    });
     state.set_inventory(
         crate::model::Inventory {
             apps,

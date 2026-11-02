@@ -11,7 +11,7 @@ use std::{collections::HashSet, sync::mpsc, thread};
 #[path = "platform-install.rs"]
 mod installation;
 
-pub const APP_ID: &str = "com.ecklf.luma";
+pub const APP_ID: &str = "com.lumaglass.launcher";
 pub const HOME_ID: &str = "com.webos.app.home";
 pub const FULL_HOME_ID: &str = "com.webos.app.fullhome";
 
@@ -149,26 +149,6 @@ pub fn install_dir() -> Result<std::path::PathBuf, String> {
 }
 
 pub fn redirect_to_home() -> Result<bool, String> {
-    // The root-only integration mounts this marker with its native Home
-    // manifest, or writes it to /var/run on webOS 5/6, where it mounts this
-    // executable over LG's (a tile's jail sees /usr/bin without that mount).
-    // A normal tile launch then opens that same instance instead of starting
-    // a second renderer writing the same preferences.
-    let marked = |file| std::fs::read_to_string(file).is_ok_and(|marker| marker.trim() == APP_ID);
-    if marked("/usr/palm/applications/com.webos.app.home/.luma-home")
-        || marked("/var/run/luma-home")
-    {
-        thread::spawn(|| {
-            call(
-                "luna://com.webos.applicationManager/launch",
-                json!({"id": std::fs::read_to_string("/var/run/luma-home-target").ok()
-                    .filter(|id| is_home_id(id.trim())).map(|id| id.trim().to_owned()).unwrap_or_else(|| HOME_ID.into())}),
-            )
-        })
-        .join()
-        .map_err(|_| "Home launch worker failed".to_string())??;
-        return Ok(true);
-    }
     Ok(false)
 }
 
@@ -177,7 +157,6 @@ pub enum Request {
     RefreshInputs,
     Launch(String),
     Uninstall(String),
-    SyncSplash(String),
     Recent {
         generation: u64,
         command: crate::recents::Command,
@@ -202,15 +181,13 @@ pub struct Platform {
     sender: mpsc::Sender<Request>,
     pub receiver: mpsc::Receiver<Response>,
     pub webos: bool,
-    splash_enabled: bool,
 }
 
 impl Platform {
-    pub fn new(webos: bool, splash_enabled: bool) -> Self {
+    pub fn new(webos: bool, _splash_enabled: bool) -> Self {
         let (sender, requests) = mpsc::channel();
         let (responses, receiver) = mpsc::channel();
         thread::spawn(move || {
-            let mut splash_background = None;
             let mut desktop_inventory = demo_inventory();
             let mut desktop_recents = if webos {
                 vec![]
@@ -340,18 +317,6 @@ impl Platform {
                     } else {
                         Ok(())
                     }),
-                    Request::SyncSplash(background) => {
-                        if webos
-                            && splash_enabled
-                            && splash_background.as_ref() != Some(&background)
-                        {
-                            match sync_splash(&background) {
-                                Ok(()) => splash_background = Some(background),
-                                Err(error) => eprintln!("Luma splash: {error}"),
-                            }
-                        }
-                        continue;
-                    }
                 };
                 if responses.send(response).is_err() {
                     break;
@@ -362,7 +327,6 @@ impl Platform {
             sender,
             receiver,
             webos,
-            splash_enabled,
         }
     }
 
@@ -371,9 +335,7 @@ impl Platform {
     }
 
     pub fn sync_splash(&self, background: &str) {
-        if self.webos && self.splash_enabled && !crate::wallpapers::valid_id(background) {
-            self.send(Request::SyncSplash(background.to_owned()));
-        }
+        let _ = background;
     }
 }
 
@@ -387,15 +349,6 @@ fn helper_command(operation: &str, arguments: &[String]) -> Result<String, Strin
     Ok(parts.join(" "))
 }
 
-/// Quote for the exec service's shell and systemd's ExecStart environment expansion. Shell
-/// quoting alone does not protect `$` variables inside the embedded installer script.
-/// Doubling dollars works on older TV systemd versions without --expand-environment=no.
-/// Leave `%` untouched: systemd-run passes ExecStart over D-Bus, not through unit-file parsing.
-fn update_argument(value: &str) -> String {
-    let escaped = value.replace('$', "$$");
-    format!("'{}'", escaped.replace('\'', "'\\''"))
-}
-
 /// Hands a downloaded, verified update to `tv/self-update.sh`, run as root through Homebrew
 /// Channel's exec in its own systemd unit: exec ends its children when the call returns, and the
 /// install closes Luma.
@@ -404,94 +357,16 @@ pub fn start_update(
     attempt: &str,
     ipk: &std::path::Path,
 ) -> Result<(), String> {
-    let directory = install_dir()?;
-    let command = format!(
-        "systemd-run --unit=luma-update-{} --collect /bin/sh -c {} self-update {} {} {} {} {}",
-        attempt,
-        update_argument(include_str!("../tv/self-update.sh")),
-        update_argument(&ipk.to_string_lossy()),
-        update_argument(&release.sha256),
-        update_argument(&release.version),
-        update_argument(&directory.to_string_lossy()),
-        update_argument(attempt),
-    );
-    let envelope = call(
-        "luna://org.webosbrew.hbchannel.service/exec",
-        json!({"command": command}),
-    )?;
-    // systemd-run prints nothing on stdout once the unit started; only its exit status counts.
-    // A transport error can be ambiguous: the worker preserves the IPK and observes the result.
-    for key in ["returnCode", "exitCode"] {
-        if let Some(code) = envelope.get(key)
-            && code != 0
-            && code != "0"
-        {
-            let stderr = envelope.get("stderrString").and_then(Value::as_str);
-            return Err(format!(
-                "The installer could not be started ({key}={code}): {}",
-                output_excerpt(stderr.unwrap_or(""))
-            ));
-        }
-    }
-    Ok(())
+    let _ = (release, attempt, ipk);
+    Err("Self-update is disabled in the standalone fork".into())
 }
 
 /// Read only the root-owned result; the caller matches its unguessable attempt ID.
 pub fn update_result_for(
     attempt: Option<&str>,
 ) -> Result<Option<crate::update::InstallResult>, String> {
-    let file = match attempt {
-        Some(id) if id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()) => {
-            format!("result.{id}.json")
-        }
-        Some(_) => return Err("Invalid update attempt".into()),
-        None => "result.json".into(),
-    };
-    let envelope = call(
-        "luna://org.webosbrew.hbchannel.service/exec",
-        json!({
-            "command": format!("cat /var/lib/luma-update/{file} 2>/dev/null || true")
-        }),
-    )?;
-    let output = envelope
-        .get("stdoutString")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim();
-    if output.is_empty() {
-        return Ok(None);
-    }
-    serde_json::from_str(output)
-        .map(Some)
-        .map_err(|e| format!("Invalid installer result: {e}"))
-}
-
-fn sync_splash(background: &str) -> Result<(), String> {
-    let directory = install_dir()?;
-    // The executable/manifest Home already runs privileged. Avoid starting another process or
-    // queuing a Homebrew call behind its startup; file work still stays on the platform worker.
-    #[cfg(all(feature = "webos", unix))]
-    if unsafe { libc::geteuid() } == 0 {
-        return luma_tv_helper::files::sync_splash(
-            &luma_tv_helper::system::Tv,
-            &directory,
-            background,
-        )
-        .map(|_| ());
-    }
-    let command = helper_command(
-        "sync-splash",
-        &[json!({"directory":directory,"background":background}).to_string()],
-    )?;
-    let envelope = call(
-        "luna://org.webosbrew.hbchannel.service/exec",
-        json!({"command": command}),
-    )?;
-    let saved = inventory_payload(&envelope, "background")?;
-    if saved.as_str() != Some(background) {
-        return Err("Splash background was not updated".into());
-    }
-    Ok(())
+    let _ = attempt;
+    Ok(None)
 }
 
 /// Protect launcher identities and vendor system namespaces, never titles.
@@ -507,6 +382,7 @@ pub fn can_uninstall(id: &str) -> bool {
         && !matches!(
             id,
             APP_ID
+                | "com.ecklf.luma"
                 | HOME_ID
                 | "com.luma.native"
                 | "com.luma.launcher"
@@ -874,40 +750,6 @@ pub fn normalize_inputs(raw: &Value) -> Result<Vec<Input>, String> {
         });
     }
     Ok(inputs)
-}
-
-#[cfg(test)]
-mod update_argument_tests {
-    use super::*;
-
-    #[test]
-    fn installer_variables_are_escaped_and_printf_formats_are_preserved() {
-        let script = include_str!("../tv/self-update.sh");
-        let argument = update_argument(script);
-        assert!(argument.contains("$${#ATTEMPT}"));
-        assert!(argument.contains("$$(date +%T)"));
-        assert!(argument.contains("$$IPK"));
-        assert!(argument.contains("%s"));
-        assert!(!argument.contains("%%s"));
-    }
-
-    #[test]
-    fn exec_shell_preserves_systemd_escapes_and_argument_boundaries() {
-        for value in [
-            include_str!("../tv/self-update.sh"),
-            "path with 'quotes' and $VARIABLE ${BRACES} $(command) %n %% \\slashes",
-        ] {
-            let output = std::process::Command::new("/bin/sh")
-                .args(["-c", &format!("printf '%s' {}", update_argument(value))])
-                .output()
-                .unwrap();
-            assert!(output.status.success());
-            let argument = String::from_utf8(output.stdout).unwrap();
-            assert_eq!(argument, value.replace('$', "$$"));
-            // systemd reduces each escaped dollar pair, leaving expansion to /bin/sh.
-            assert_eq!(argument.replace("$$", "$"), value);
-        }
-    }
 }
 
 #[cfg(test)]

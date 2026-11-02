@@ -585,6 +585,9 @@ fn run() -> Result<(), String> {
     if options.webos_home && !platform::runs_as_lg_home() {
         log_home_output();
     }
+    if options.webos_home || platform::runs_as_lg_home() {
+        return Err("Luma Liquid Glass only supports standalone app launches".into());
+    }
     let webos = cfg!(feature = "webos");
     let startup_stage = |stage: &str| {
         if webos {

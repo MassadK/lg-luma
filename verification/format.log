@@ -1,0 +1,8 @@
+
+> lg-luma@0.1.0 format:check /workspace/scratch/9a9d8c55b501/luma-liquid-glass
+> cargo fmt --all -- --check && oxfmt --check .
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 214ms on 60 files using 8 threads.

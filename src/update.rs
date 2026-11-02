@@ -15,8 +15,8 @@ pub mod discovery {
         Failed,
     }
 
-    pub fn public_checks_enabled(scripted: bool, simulated: bool) -> bool {
-        !scripted && !simulated
+    pub fn public_checks_enabled(_scripted: bool, _simulated: bool) -> bool {
+        false // Standalone fork never queries or installs upstream releases.
     }
 
     pub struct Service {
@@ -156,7 +156,7 @@ pub mod discovery {
         use super::*;
         #[test]
         fn interactive_checks_are_live_but_scripts_and_simulations_stay_offline() {
-            assert!(public_checks_enabled(false, false));
+            assert!(!public_checks_enabled(false, false));
             assert!(!public_checks_enabled(true, false));
             assert!(!public_checks_enabled(false, true));
             assert!(!public_checks_enabled(true, true));

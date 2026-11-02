@@ -1,0 +1,48 @@
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+home { App: 'netflix' }
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+apps { App: 'netflix' }
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+settings InterfaceStyle
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+original-luma { App: 'netflix' }
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+crystal-clear { App: 'netflix' }
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+frosted { App: 'netflix' }
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+crystal-settings InterfaceStyle
+Luma SDL video driver: offscreen
+Luma text rendering: Msaa, embolden 0 px
+Luma GL multisampling: 4 samples
+Luma partial redraw: off
+Luma drawable: 1280x720, density 0.667x, 4K buffer: false
+frosted-settings InterfaceStyle

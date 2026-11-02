@@ -1,0 +1,360 @@
+   Compiling luma v0.1.0 (/workspace/scratch/9a9d8c55b501/luma-liquid-glass)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.54s
+     Running unittests src/main.rs (target/debug/deps/luma-6b0856c282e73cae)
+
+running 273 tests
+test app_artwork::tests::inventory_metadata_resolves_absolute_relative_and_manifest_fallback_paths ... ok
+test app_artwork::tests::prefetch_decodes_every_icon_although_the_request_queue_is_short ... ok
+test app_artwork::tests::a_refresh_during_a_load_keeps_its_result ... ok
+test app_artwork::tests::reset_discards_prefetch_backlog_and_queued_requests ... ok
+test app_artwork::tests::favorite_badge_uses_the_local_gradient_and_maximum_black_white_contrast ... ok
+test app_artwork::tests::local_reads_fall_back_from_a_corrupt_large_icon_to_manifest_artwork ... ok
+test app_artwork::tests::decoded_cache_evicts_old_icons_when_scrolling_through_many_apps ... ok
+test app_artwork::tests::refresh_discards_old_worker_results_and_reloads_changed_artwork ... ok
+test app_artwork::tests::grid_and_options_use_matching_adaptive_hearts_without_a_backing_circle ... ok
+test app_artwork::tests::unavailable_icons_are_not_retried_on_every_redraw ... ok
+test app_artwork::tests::a_refresh_keeps_unchanged_icons_and_reads_updated_apps_again ... ok
+test app_artwork::tests::visible_cards_switch_from_fallback_to_a_single_composited_installed_surface ... ok
+test branding::tests::desktop_demo_contains_every_bundled_logo_and_no_duplicate_apps ... ok
+test branding::tests::every_curated_id_is_unique_and_selects_its_brand_without_title_matching ... ok
+test branding::tests::now_tv_aliases_select_now_without_rebranding_other_sky_or_now_apps ... ok
+test damage::tests::a_moved_shape_damages_its_old_and_new_place_only ... ok
+test damage::tests::an_inserted_focus_ring_realigns_instead_of_redrawing_everything ... ok
+test damage::tests::an_unchanged_frame_names_a_pixel_inside_the_drawable ... ok
+test damage::tests::an_unchanged_scene_has_no_damage ... ok
+test damage::tests::changed_clip_or_fade_state_redraws_everything ... ok
+test damage::tests::culling_covers_every_pixel_the_damage_clears ... ok
+test damage::tests::older_back_buffers_need_every_change_since_their_frame ... ok
+test damage::tests::shadows_include_their_blur ... ok
+test damage::tests::text_damages_the_full_width_of_its_line ... ok
+test damage::tests::the_first_frame_and_unknown_buffer_ages_redraw_everything ... ok
+test diagnostics::tests::profiling_excludes_warmup_and_capture_stalls ... ok
+test app_artwork::tests::visible_requests_and_promoted_prefetches_run_before_background_backlog ... ok
+test i18n::tests::clock_and_date_follow_the_selected_locale ... ok
+test i18n::tests::dutch_dates_cover_leap_days_and_month_boundaries ... ok
+test i18n::tests::bundled_cjk_font_covers_every_traditional_chinese_message ... ok
+test i18n::tests::every_message_has_all_languages_and_no_empty_values ... ok
+test i18n::tests::french_dates_use_the_ordinal_first_day_and_accented_months ... ok
+test i18n::tests::homebrew_description_lists_every_supported_language ... ok
+test i18n::tests::localization_keeps_user_provided_names_intact ... ok
+test i18n::tests::portuguese_dates_include_accented_names_and_handle_leap_days ... ok
+test i18n::tests::traditional_chinese_follows_simplified_and_preserves_locale_preferences ... ok
+test i18n::tests::vietnamese_dates_cover_leap_days_and_weekend_names ... ok
+test platform::home_identity_tests::both_home_variants_are_hidden_from_application_inventory ... ok
+test platform::home_identity_tests::executable_identity_has_priority_over_conflicting_launch_metadata ... ok
+test i18n::tests::every_translation_preserves_the_english_message_placeholders ... ok
+test platform::installation::tests::home_mount_selects_its_source_for_both_developer_and_production_installs ... ok
+test platform::installation::tests::missing_or_unrelated_package_never_silently_uses_another_installation ... ok
+test platform::installation::tests::normal_launch_keeps_its_own_package_even_with_another_installation ... ok
+test raster::tests::a_letterboxed_drawable_uses_its_fitted_density ... ok
+test raster::tests::requested_resolution_is_validated_separately_from_the_actual_drawable ... ok
+test tests::a_notice_does_not_escape_modal_focus_and_closing_restores_the_app ... ok
+test platform::installation::tests::home_mount_requires_the_matching_native_package_manifest ... ok
+test tests::app_activation_opens_options_with_open_focused_and_next_ok_launches ... ok
+test tests::app_categories_and_search_use_matching_pills_and_larger_heavier_labels ... ok
+test tests::app_name_settings_use_independent_defaults_including_with_legacy_preferences ... ok
+test tests::apps_scroll_behind_navigation_without_a_top_cutoff_or_fade ... ok
+test tests::asset_loading_and_unknown_app_cards_do_not_require_collected_artwork ... ok
+test tests::apps_toolbar_stays_fixed_above_scrolling_cards_and_keeps_pointer_priority ... ok
+test tests::background_sidebar_right_focuses_upload_and_ok_restores_the_applied_background ... ok
+test tests::cancelling_options_preserves_identity_and_does_not_save ... ok
+test tests::auto_input_visibility_requires_a_positive_connection_report ... ok
+test tests::category_focus_active_and_clear_button_share_the_pill_style ... ok
+test tests::clock_choices_only_highlight_focus_while_preserving_saved_checkmarks ... ok
+test tests::categories_and_search_have_clear_actions_and_conditional_hidden_control ... ok
+test tests::clock_format_subpage_saves_and_restores_its_parent_row ... ok
+test tests::companion_removal_updates_the_shortcut_list_on_close ... ok
+test tests::curated_branding_does_not_use_title_words_or_partial_id_matches ... ok
+test tests::clock_date_and_home_input_descriptions_use_larger_text ... ok
+test tests::custom_input_names_keep_the_label_port_and_status_as_detail ... ok
+test tests::custom_tiles_are_sanitized_and_get_stable_unique_ids ... ok
+test tests::date_formats_preserve_localized_default_and_pad_numeric_dates ... ok
+test tests::date_widget_settings_persist_and_restore_parent_focus ... ok
+test tests::deletion_completion_does_not_steal_focus_after_dismissal ... ok
+test tests::delete_confirmation_defaults_to_cancel_and_back_restores_side_popup ... ok
+test tests::failed_deletion_refreshes_inventory_and_closes_stale_confirmation ... ok
+test tests::failed_first_inventory_keeps_loading_until_retries_are_used_up ... ok
+test tests::favorites_edge_fragments_share_draw_hit_and_wheel_viewports ... ok
+test tests::focused_navigation_tabs_switch_pages_immediately ... ok
+test tests::foreground_check_needs_focus_after_a_relaunch_from_the_background ... ok
+test tests::deletion_is_single_flight_and_only_success_cleans_up_preferences ... ok
+test tests::gallery_and_grid_navigation_scroll_to_keep_focus_visible ... ok
+test tests::gallery_right_crosses_rows_in_gallery_order ... ok
+test tests::glass_mode_remote_controls_clamp_and_keep_saved_values ... ok
+test tests::glass_preferences_sanitize_invalid_opacity ... ok
+test tests::greeting_subpage_opens_the_keyboard_and_back_restores_its_parent ... ok
+test tests::greeting_name_replacement_commits_on_every_keyboard_completion_route ... ok
+test tests::greeting_visibility_toggle_persists_without_clearing_name_or_hiding_date ... ok
+test tests::hdmi_plug_in_reports_the_cable_state_when_connected_only_means_present ... ok
+test tests::hiding_restores_nearest_app_and_hidden_filter_can_restore_it ... ok
+test tests::home_lifecycle_replies_map_for_both_registration_versions ... ok
+test tests::home_relaunch_commits_keyboard_edits_before_clearing_the_subpage ... ok
+test tests::home_and_apps_render_only_their_own_caption_preference ... ok
+test tests::home_relaunch_dismisses_recents_and_ignores_its_pending_reply ... ok
+test tests::home_relaunch_dismisses_overlays_without_cancelling_mutations ... ok
+test tests::home_weather_setup_returns_through_the_widgets_weather_parent ... ok
+test tests::input_name_actions_only_highlight_the_focused_row_and_keep_the_saved_mode ... ok
+test tests::input_names_are_sanitized_and_old_preferences_load_without_them ... ok
+test tests::input_refresh_tests::a_disconnect_snapshot_cannot_move_the_pressed_card_before_release ... ok
+test tests::input_refresh_tests::a_removed_port_restores_valid_input_settings_focus ... ok
+test tests::input_refresh_tests::disconnect_reconciles_home_focus_and_preserves_visibility_overrides ... ok
+test tests::input_refresh_tests::hidden_screens_cancel_scheduled_reads_without_duplicating_in_flight_requests ... ok
+test tests::input_refresh_tests::live_signal_keeps_card_geometry_names_apps_and_preferences ... ok
+test tests::input_refresh_tests::polling_only_runs_on_visible_focused_tv_input_screens_outside_interactions ... ok
+test tests::input_refresh_tests::signal_never_overrides_the_official_cable_state_or_auto_visibility ... ok
+test tests::input_refresh_tests::slow_reads_are_bounded_and_errors_preserve_the_last_valid_snapshot ... ok
+test tests::input_refresh_tests::snapshots_wait_for_release_and_yield_to_a_newer_full_inventory ... ok
+test tests::input_visibility_has_explicit_choices_and_returns_to_the_same_input ... ok
+test tests::inputs_without_hdmi_plug_in_keep_the_connected_report ... ok
+test tests::inventory_filters_system_apps_duplicates_and_unsafe_identifiers ... ok
+test tests::inventory_success_resets_failures_and_later_failures_show_at_once ... ok
+test tests::inventory_visibility_cases_match_the_launcher_filters ... ok
+test tests::keyboard_done_saves_a_typed_input_name ... ok
+test tests::keyboard_is_modal_and_back_preserves_then_clears_search ... ok
+test tests::home_relaunch_returns_from_apps_and_settings ... ok
+test tests::known_app_ids_preserve_the_curated_brands_and_categories ... ok
+test tests::language_list_scrolls_under_fixed_ui_without_clipping_or_fades ... ok
+test tests::language_selection_restores_its_parent_and_is_saved_with_preferences ... ok
+test tests::long_captions_expand_rows_without_overlapping_the_next_row ... ok
+test tests::partial_refresh_preserves_valid_inputs_and_never_invents_tv_apps ... ok
+test tests::pinning_a_hidden_app_restores_it_and_leaves_hidden_when_empty ... ok
+test tests::pointer_focus_does_not_scroll_the_clicked_control ... ok
+test tests::opening_side_popup_preserves_card_artwork_geometry_with_or_without_captions ... ok
+test tests::preferences_round_trip_and_corrupt_data_is_not_silently_overwritten ... ok
+test tests::prewarm_waits_while_recents_replaces_the_page ... ok
+test tests::recent_tests::a_failed_close_returns_the_same_card_and_restores_its_hit_target ... ok
+test tests::recent_tests::a_short_back_on_home_opens_recents_and_the_next_press_restores_the_app ... ok
+test tests::recent_tests::actions_match_stock_home_without_synthetic_process_kills ... ok
+test tests::recent_tests::back_dismissal_consumes_repeats_native_exit_and_release_without_quitting ... ok
+test tests::recent_tests::back_distinguishes_taps_holds_delayed_releases_and_cancelled_presses ... ok
+test tests::recent_tests::close_selects_the_hovered_cards_neighbor_and_preserves_browsing_during_the_request ... ok
+test tests::recent_tests::closing_is_serialized_refreshes_on_success_and_keeps_a_neighbor_focused ... ok
+test tests::recent_tests::closing_lifts_the_card_and_fills_its_slot_without_a_refresh_jump ... ok
+test tests::recent_tests::closing_recent_cards_keeps_the_close_and_follow_up_refresh_quiet ... ok
+test tests::recent_tests::closing_the_last_slot_brings_the_previous_card_forward_and_reduced_motion_snaps ... ok
+test tests::recent_tests::dismissing_an_initial_read_does_not_flash_loading_or_an_unconfirmed_empty_state ... ok
+test tests::recent_tests::empty_recents_has_no_explanatory_subtitle ... ok
+test tests::recent_tests::failed_actions_keep_history_and_stale_replies_cannot_reopen_or_replace_a_session ... ok
+test tests::recent_tests::home_header_has_only_navigation_and_tv_settings ... ok
+test tests::recent_tests::native_back_and_exit_survive_an_unmapped_or_layout_dependent_keycode ... ok
+test tests::protected_apps_cannot_be_deleted_through_ui_or_worker ... ok
+test tests::recent_tests::native_hold_opens_once_and_the_next_physical_back_press_dismisses ... ok
+test tests::recent_tests::pointer_interruption_freezes_cards_without_freezing_the_crossfade ... ok
+test tests::recent_tests::recents_crossfade_reverses_without_jumping_and_restores_parent_input_immediately ... ok
+test tests::recent_tests::native_home_survives_an_unmapped_or_layout_dependent_keycode ... ok
+test tests::recent_tests::recents_has_only_cards_without_action_buttons_or_footer ... ok
+test tests::recent_tests::recents_is_modal_and_restores_the_exact_settings_parent ... ok
+test tests::recent_tests::stacked_cards_hit_the_front_card_in_overlaps_and_rear_cards_only_where_exposed ... ok
+test tests::recent_tests::recents_pointer_focus_never_moves_hit_regions_and_reduced_motion_snaps ... ok
+test tests::recent_tests::system_history_preserves_order_and_inputs_and_rejects_invalid_entries ... ok
+test tests::recent_tests::youtube_recents_uses_the_apps_vector_and_the_same_relative_logo_geometry ... ok
+test tests::recent_tests::the_last_card_exits_before_the_empty_state_and_reduced_motion_skips_the_exit ... ok
+test tests::reduced_motion_disables_panel_wallpaper_and_notification_animation ... ok
+test tests::remote_can_clear_a_saved_greeting_name_without_moving_the_controls ... ok
+test tests::remote_renames_and_resets_an_input_from_its_settings_page ... ok
+test tests::remote_routes_from_header_and_back_through_settings ... ok
+test tests::remote_toolbar_focus_normalizes_scroll_but_hover_does_not ... ok
+test tests::removing_weather_location_clears_cache_and_cancels_pending_results ... ok
+test tests::reorder_persists_order_and_keeps_selected_identity ... ok
+test tests::remote_can_select_and_restore_every_language ... ok
+test tests::reordering_skips_hidden_and_unavailable_favorite_slots ... ok
+test tests::settings_order_language_sort_and_shortcut_empty_card ... ok
+test tests::settings_lists_keep_bottom_padding_for_remote_and_wheel_scrolling ... ok
+test tests::shortcut_settings_offer_qr_editing_and_a_test_remove_popup ... ok
+test tests::shortcut_tiles_alone_do_not_stop_inventory_retries ... ok
+test tests::shortcut_list_scroll_and_pointer_focus_preserve_control_positions ... ok
+test tests::shortcut_tiles_keep_apps_options_and_never_launch_or_uninstall_a_platform_app ... ok
+test tests::shortcut_tiles_open_a_modal_editor_for_another_device ... ok
+test tests::standalone_never_starts_an_upstream_installer ... ok
+test tests::system_version_is_inside_the_update_status_card_without_a_separate_row ... ok
+test tests::system_category_owns_refresh_and_quit_and_restores_sidebar_focus ... ok
+test tests::text_rendering_preferences_default_to_msaa_and_recover_invalid_values ... ok
+test tests::tile_urls_need_a_host_the_request_client_accepts ... ok
+test tests::text_rendering_choices_persist_and_back_restores_the_system_row ... ok
+test tests::tiles_edited_elsewhere_join_and_leave_home_like_tv_edits ... ok
+test tests::time_format_selects_seconds_without_changing_the_hour_format ... ok
+test tests::uncertain_deletion_uses_complete_inventory_instead_of_visible_app_filtering ... ok
+test tests::unrelated_app_ids_and_titles_keep_their_installed_artwork ... ok
+test tests::tv_settings_button_is_centered_alongside_navigation ... ok
+test tests::unsupported_language_preferences_recover_without_losing_other_choices ... ok
+test tests::wallpaper_tests::automatic_changes_preserve_manual_splash_across_saves_and_restart_and_manual_selection_resets_time ... ok
+test tests::wallpaper_tests::background_popup_is_modal_lifts_the_same_thumbnail_and_restores_its_parent ... ok
+test tests::wallpaper_tests::catalog_updates_keep_the_focused_image_and_pointer_geometry_stationary ... ok
+test tests::wallpaper_tests::custom_gallery_navigation_reveals_whole_cards_in_incomplete_rows ... ok
+test tests::wallpaper_tests::cycling_button_toggles_on_off_without_opening_a_page_or_moving_controls ... ok
+test tests::wallpaper_tests::cycling_uses_all_uploaded_ids_but_not_deleted_or_pending_deletion_entries ... ok
+test tests::wallpaper_tests::filtered_bundled_entries_do_not_misidentify_custom_thumbnails_or_popup_parents ... ok
+test tests::wallpaper_tests::former_exclusions_are_ignored_and_only_the_on_off_state_is_saved ... ok
+test tests::wallpaper_tests::gallery_scrolls_behind_fixed_controls_without_clipping_or_fades ... ok
+test tests::wallpaper_tests::gradient_toggle_is_saved_stable_and_switches_bundled_and_uploaded_images ... ok
+test tests::wallpaper_tests::every_unselected_bundled_background_can_be_removed_and_stays_removed_after_reload ... ok
+test tests::wallpaper_tests::removed_popup_entry_closes_safely_and_preference_sanitizing_protects_the_selection ... ok
+test tests::wallpaper_tests::scrolled_backgrounds_cannot_capture_upload_or_sidebar_pointer_hits ... ok
+test tests::wallpaper_tests::remote_background_focus_stays_below_the_fixed_upload_action ... ok
+test tests::wallpaper_tests::selected_background_has_no_delete_action_and_rejects_forced_confirmation ... ok
+test tests::wallpaper_tests::upload_discovery_does_not_apply_and_custom_selection_uses_immutable_paths ... ok
+test tests::wallpaper_tests::upload_button_is_compact_and_rotation_is_right_aligned_in_every_language ... ok
+test tests::wallpaper_tests::upload_is_modal_and_close_restores_its_exact_parent ... ok
+test tests::wallpaper_tests::upload_instructions_are_ordered_and_only_the_displayed_url_loses_its_slash ... ok
+test tests::wallpaper_tests::upload_stays_active_without_desktop_focus_but_requires_tv_focus ... ok
+test tests::wallpaper_tests::upload_sits_left_of_rotation_and_both_remain_fixed_in_every_language ... ok
+test tests::wallpaper_tests::uploaded_deletion_is_single_flight_handles_failures_and_keeps_unrelated_focus ... ok
+test tests::weather_units_save_without_replacing_celsius_cache_and_hide_keeps_city ... ok
+test tests::widening_favorites_does_not_widen_apps_or_unclip_offscreen_rows ... ok
+test tests::weather_location_keyboard_back_and_sidebar_routes_restore_focus ... ok
+test tests::widgets_group_existing_settings_and_restore_each_parent_without_changing_preferences ... ok
+test text_rendering::tests::environment_overrides_take_precedence_over_both_saved_modes ... ok
+test text_rendering::tests::old_style_defaults_keep_no_emboldening_even_on_single_sample_fallbacks ... ok
+test tests::widgets_are_localized_without_legacy_sidebar_entries ... ok
+test tile_editor::tests::a_real_http_save_and_removal_change_the_list ... ok
+test tile_editor::tests::every_choosable_icon_ships_its_markup ... ok
+test tile_editor::tests::only_the_session_origin_token_and_json_allow_changes ... ok
+test tile_editor::tests::a_test_request_is_sent_without_saving ... ok
+test tile_editor::tests::page_assets_and_the_tile_list_are_served_under_the_token ... ok
+test app_artwork::tests::hundreds_of_apps_stay_within_the_cache_bounds_across_refreshes ... ok
+test tile_editor::tests::saving_adds_a_tile_with_a_unique_id_and_edits_keep_it ... ok
+test tile_editor::tests::saving_uses_the_tv_editors_rules ... ok
+test update::discovery::tests::compares_numeric_versions_and_never_offers_equal_or_older_releases ... ok
+test update::discovery::tests::disabled_service_never_contacts_the_network ... ok
+test update::discovery::tests::interactive_checks_are_live_but_scripts_and_simulations_stay_offline ... ok
+test update::discovery::tests::local_http_checks_bound_responses_and_report_errors ... ok
+test update::discovery::tests::preview_requires_a_valid_current_or_newer_version ... ok
+test update::discovery::tests::rejects_invalid_prerelease_and_foreign_metadata ... ok
+test update::tests::attempt_paths_are_private_unique_and_results_are_terminal_only_when_finished ... ok
+test update::tests::disabled_installer_rejects_downloads_without_network_or_platform_calls ... ok
+test update::tests::installer_rejects_foreign_and_ambiguous_manifests ... ok
+test update::tests::only_luma_release_assets_with_a_checksum_are_accepted ... ok
+test update::tests::versions_compare_numerically ... ok
+test view::tests::auto_rotation_keeps_a_compact_gap_and_right_aligned_state ... ok
+test view::tests::fitting_remeasures_when_shrinking_changes_the_optical_font ... ok
+test view::tests::hidden_home_widgets_collapse_without_moving_favorites_or_inputs ... ok
+test app_artwork::tests::transparent_logos_reaching_the_edges_keep_the_neutral_card ... ok
+test view::tests::settings_breadcrumbs_use_equal_gaps_and_only_highlight_the_leaf ... ok
+test view::tests::short_greetings_keep_their_original_style_and_geometry ... ok
+test view::tests::shrinking_a_greeting_preserves_weather_favorites_and_control_positions ... ok
+test view::tests::long_localized_greetings_fit_on_one_line_without_changing_the_name ... ok
+test view::tests::upload_button_padding_tracks_the_label_in_every_language ... ok
+test wallpaper_cycle::tests::cycling_is_due_only_when_enabled_after_fifteen_minutes ... ok
+test wallpaper_cycle::tests::enabled_rotation_advances_once_after_startup_catalog_or_timeout ... ok
+test wallpaper_cycle::tests::every_available_background_participates_in_order_and_wraps ... ok
+test wallpaper_cycle::tests::on_off_preferences_default_off_round_trip_and_load_legacy_modes ... ok
+test tile_editor::tests::session_closure_revokes_the_socket_and_reopening_rotates_the_capability ... ok
+test app_artwork::tests::the_worker_keeps_decoding_while_the_ui_is_idle ... ok
+test wallpapers::tests::cancelling_a_slow_request_releases_the_worker_without_waiting_for_the_body ... ok
+test app_artwork::tests::transparent_edges_keep_the_logo_colour_when_scaled ... ok
+test wallpapers::tests::deletion_rejects_symlink_roots_and_entries_and_never_follows_internal_symlinks ... ok
+test app_artwork::tests::supported_icons_decode_to_bounded_pixels_and_runtime_card_colours ... ok
+test wallpapers::tests::generated_ids_are_safe_and_selection_survives_preferences_reload ... ok
+test wallpapers::tests::gallery_capacity_is_checked_before_decoding_or_creating_another_upload ... ok
+test wallpapers::tests::only_the_session_origin_host_token_and_upload_header_allow_writes ... ok
+test wallpapers::tests::protocol_rejects_oversized_ambiguous_and_chunked_requests ... ok
+test wallpapers::tests::qr_generation_is_deterministic_and_has_a_reasonable_size ... ok
+test tile_editor::tests::reopening_preserves_unacknowledged_saves_and_removals ... ok
+test wallpapers::tests::slashless_session_urls_redirect_to_the_local_asset_base ... ok
+test wallpapers::tests::session_closure_revokes_the_socket_and_reopening_rotates_the_capability ... ok
+test wallpapers::tests::upload_tokens_are_eight_unbiased_alphanumeric_characters ... ok
+test wallpapers::tests::decoder_enforces_transport_dimensions_and_composites_transparent_pngs ... ok
+test app_artwork::tests::transparent_logos_get_a_contrasting_gradient_in_their_own_hue ... ok
+test wallpapers::tests::legacy_named_uploads_keep_their_ids_and_load_without_names ... ok
+test wallpapers::tests::cancellation_before_commit_cleans_only_the_new_staging_files ... ok
+test weather::tests::api_readings_and_conditions_cover_invalid_data_and_night ... ok
+test weather::tests::cache_reuse_and_units_do_not_trigger_another_request ... ok
+test weather::tests::editing_query_invalidates_old_results_and_short_queries_do_not_search ... ok
+test weather::tests::malformed_weather_preferences_do_not_lose_existing_favorites ... ok
+test weather::tests::no_requests_without_a_location_enabled_widget_and_visible_home ... ok
+test weather::tests::removed_disabled_or_changed_locations_reject_in_flight_results ... ok
+test weather::tests::returning_home_retries_stale_weather_without_waiting_for_the_old_retry_timer ... ok
+test weather::tests::search_results_are_validated_normalized_and_deduplicated ... ok
+test weather::tests::temperatures_convert_the_unrounded_reading_and_use_web_rounding ... ok
+test weather::tests::weather_failure_keeps_valid_cache_labels_it_saved_and_retries_later ... ok
+test weather_service::tests::cache_writes_are_ordered_and_flushed_before_shutdown ... ok
+test weather_service::tests::mock_origins_are_loopback_only_and_never_follow_redirects ... ok
+test wallpapers::tests::symlink_storage_and_gallery_entries_are_never_followed ... ok
+test wallpapers::tests::browser_assets_are_local_and_a_real_http_upload_needs_no_name ... ok
+test wallpapers::tests::validation_and_cancellation_leave_no_partial_gallery_entries ... ok
+test wallpapers::tests::uploads_retain_full_resolution_unshaded_images_and_discover_legacy_fallbacks ... ok
+test wallpapers::tests::deletion_protects_selected_and_bundled_backgrounds_and_only_removes_the_requested_upload ... ok
+test wallpapers::tests::worker_reports_deletion_before_the_updated_catalog ... ok
+test wallpapers::tests::uploads_are_unnamed_normalized_immutable_and_discoverable_after_restart ... ok
+
+test result: ok. 273 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.91s
+
+     Running unittests src/lib.rs (target/debug/deps/luma_tv_helper-c7efa18c0afb48a0)
+
+running 43 tests
+test tests::boot_apply_does_not_take_another_apps_screen ... ok
+test tests::busy_mounts_use_lazy_unmount_and_restore_reports_stuck_processes ... ok
+test tests::a_stuck_home_process_is_reported_after_unmount_recovery ... ok
+test tests::executable_apply_mounts_marks_and_launches_then_restore_unmounts ... ok
+test tests::failed_atomic_write_cleans_its_private_temporary_file ... ok
+test tests::foreign_mounts_are_left_untouched ... ok
+test tests::developer_and_production_splash_precedence_matches_native_storage ... ok
+test tests::home_methods_reject_unknown_firmware_or_lifecycle ... ok
+test tests::icon_discovery_uses_live_installation_then_manifest_and_default_fallbacks ... ok
+test tests::icon_paths_cannot_escape_but_shell_punctuation_remains_literal ... ok
+test tests::changing_an_enabled_target_or_using_a_foreign_hook_is_rejected ... ok
+test tests::accepted_close_waits_boundedly_and_a_close_race_can_succeed ... ok
+test tests::invalid_ids_and_unrelated_manifests_cannot_select_private_artwork ... ok
+test tests::failed_launch_retries_once_then_restores_stock_files ... ok
+test tests::copied_recovery_binary_and_shell_survive_package_removal ... ok
+test tests::input_verification_failure_rolls_back_and_existing_registration_is_preserved ... ok
+test tests::missing_or_invalid_splash_sources_preserve_previous_images ... ok
+test tests::normal_close_denials_and_stuck_instances_prevent_mounting ... ok
+test tests::fullhome_round_trip_and_persisted_target_keep_their_identity ... ok
+test tests::null_manual_selection_falls_back_to_saved_background ... ok
+test tests::only_luma_mounts_are_owned_even_after_package_replacement ... ok
+test tests::old_configuration_without_method_or_target_is_readable ... ok
+test tests::installation_under_a_symlinked_temporary_parent_stays_inside_the_root ... ok
+test tests::process_matching_never_kills_a_normal_luma_or_unrelated_native_app ... ok
+test tests::manifest_takeover_rereads_staged_metadata_and_restores_the_stock_manifest ... ok
+test tests::icon_limits_are_aggregate_and_duplicate_paths_are_not_read_twice ... ok
+test tests::executable_other_or_disabled_stages_are_never_written ... ok
+test tests::package_update_replaces_the_old_bound_inode ... ok
+test tests::normal_tile_is_closed_by_app_id_and_an_exiting_instance_is_tolerated ... ok
+test tests::restoration_works_even_when_foreground_query_fails ... ok
+test tests::root_mutations_reject_non_root_callers ... ok
+test tests::malformed_missing_and_unavailable_preferences_use_package_splash ... ok
+test tests::uninstall_parser_handles_split_pretty_unicode_and_braces_in_strings ... ok
+test tests::uninstall_protects_system_apps_and_does_not_spawn_when_denied ... ok
+test tests::uninstall_rejects_failures_wrong_identity_and_resource_exhaustion ... ok
+test tests::uninstall_requires_matching_completion_not_just_acceptance ... ok
+test tests::persistent_preferences_win_over_package_local_migration_and_active_stages_refresh ... ok
+test tests::restoring_a_background_home_never_opens_over_another_app ... ok
+test tests::symlink_storage_directories_are_not_used_as_root_preferences ... ok
+test tests::release_is_attempted_even_when_the_block_request_times_out ... ok
+test tests::stage_uses_persistent_selection_and_retains_manual_background_over_rotation ... ok
+test tests::splash_updates_tile_and_only_the_enabled_own_manifest_stage ... ok
+test tests::process_runner_enforces_combined_output_and_deadline ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/main.rs (target/debug/deps/luma_helper-7fe4ad05f37fbc18)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/luma_vector_assets-9b8089a3874e8ed4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/luma_vector_geometry-02a8b39fa85a7bdd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests luma_tv_helper
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests luma_vector_geometry
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

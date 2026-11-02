@@ -64,7 +64,9 @@ impl Assets {
         } else {
             "dunes"
         };
-        let suffix = if state.preferences.wallpaper_gradient {
+        let suffix = if state.preferences.wallpaper_gradient
+            && state.preferences.interface_style == crate::model::InterfaceStyle::Original
+        {
             ""
         } else {
             "-plain"
@@ -164,6 +166,7 @@ pub struct Scene {
     pub draw: Vec<Draw>,
     pub controls: Vec<Control>,
     pub modal: Option<Rect>,
+    glass: Option<f32>,
 }
 impl Scene {
     fn new() -> Self {
@@ -171,10 +174,34 @@ impl Scene {
             draw: Vec::new(),
             controls: Vec::new(),
             modal: None,
+            glass: None,
         }
     }
     fn shape(&mut self, rect: Rect, radius: f32, fill: Color) {
-        self.draw.push(Draw::Shape(rect, radius, 0., fill));
+        if self.glass.is_some()
+            && radius >= 8.
+            && rect.w >= 100.
+            && rect.h >= 40.
+            && fill[0].max(fill[1]).max(fill[2]) < 0.36
+        {
+            self.glass_surface(rect, radius);
+        } else {
+            self.draw.push(Draw::Shape(rect, radius, 0., fill));
+        }
+    }
+    /// Low-cost GLES2 glass: two gradient endpoints and a luminous contour.
+    /// No framebuffer readback, blur render targets or per-pixel refraction.
+    fn glass_surface(&mut self, rect: Rect, radius: f32) {
+        let opacity = self.glass.unwrap_or(0.55);
+        let alpha = 0.12 + opacity * 0.76;
+        self.draw.push(Draw::RoundedGradient(
+            rect,
+            radius,
+            c(0x63798c, alpha),
+            c(0x0c1727, (alpha + 0.10).min(0.96)),
+        ));
+        self.draw
+            .push(Draw::Shape(rect, radius, 1.2, c(0xd9efff, 0.30)));
     }
     fn border(&mut self, rect: Rect, radius: f32, width: f32, color: Color) {
         self.draw.push(Draw::Shape(rect, radius, width, color));
@@ -509,6 +536,9 @@ pub fn scene_with_pill(
     now: OffsetDateTime,
 ) -> Scene {
     let mut out = Scene::new();
+    if state.preferences.interface_style == crate::model::InterfaceStyle::LiquidGlass {
+        out.glass = Some(state.preferences.glass_transparency as f32 / 100.);
+    }
     if let Some((previous, start)) = &state.previous_background {
         out.image(
             assets.background(state, previous),
@@ -531,6 +561,14 @@ pub fn scene_with_pill(
             0.,
             false,
         );
+    }
+    if out.glass.is_some() {
+        out.draw.push(Draw::RoundedGradient(
+            Rect::new(0., 0., 1920., 1080.),
+            0.,
+            c(0x050b17, 0.26),
+            c(0x050b17, 0.72),
+        ));
     }
     let content_start = out.draw.len();
     if recents_replaces_page(state) {
@@ -924,6 +962,31 @@ fn app_face(
         c(0xffffff, 1.)
     };
     let installed = artwork.is_some();
+    if out.glass.is_some() {
+        out.glass_surface(rect, radius + 5.);
+        if let Some(image) = artwork {
+            let inset = rect.h * 0.16;
+            out.draw
+                .push(Draw::AppImage(image, rect.inset(inset), 12., [1.; 4]));
+        } else if let Some(brand) = logo {
+            let (ratio, height) = brand.artwork_size();
+            let height = height * rect.h / FACE_HEIGHT;
+            out.image(
+                assets.path(format!("logos/{}.lvec", app.brand)),
+                Rect::new(
+                    rect.x + rect.w * (1. - ratio) / 2.,
+                    rect.y + (rect.h - height) / 2.,
+                    rect.w * ratio,
+                    height,
+                ),
+                0.,
+                true,
+            );
+        } else {
+            brand_mark(out, assets, app, rect, language);
+        }
+        return WHITE;
+    }
     if let Some(image) = artwork {
         out.draw.push(Draw::AppImage(image, rect, radius, [1.; 4]));
     } else {
@@ -1274,20 +1337,24 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             if focused { 14. } else { 1. },
             if focused { 0.4 } else { 0.01 },
         );
-        out.draw.push(Draw::RoundedGradient(
-            rect,
-            18.4,
-            if focused {
-                c(0x30363c, 0.70)
-            } else {
-                c(0x20252b, 0.60)
-            },
-            if focused {
-                c(0x242a30, 0.65)
-            } else {
-                c(0x171c22, 0.55)
-            },
-        ));
+        if out.glass.is_some() {
+            out.glass_surface(rect, 23.);
+        } else {
+            out.draw.push(Draw::RoundedGradient(
+                rect,
+                18.4,
+                if focused {
+                    c(0x30363c, 0.70)
+                } else {
+                    c(0x20252b, 0.60)
+                },
+                if focused {
+                    c(0x242a30, 0.65)
+                } else {
+                    c(0x171c22, 0.55)
+                },
+            ));
+        }
         out.border(
             rect,
             18.4,
@@ -1683,32 +1750,6 @@ fn filter(out: &mut Scene, state: &State, target: Target, rect: Rect, label: &st
     out.control(target, rect, false);
 }
 
-/// The existing System status card owns the only update action.
-fn update_value(state: &State) -> String {
-    use crate::update::{InstallStatus, Status};
-    let language = state.preferences.language;
-    match &state.update {
-        InstallStatus::Idle => {
-            if let Some(version) = &state.available_update {
-                language.format("installUpdate", &[("version", version)])
-            } else {
-                language
-                    .t(if state.update_status == Status::Checking {
-                        "checkingUpdates"
-                    } else {
-                        "checkAgain"
-                    })
-                    .to_owned()
-            }
-        }
-        InstallStatus::Downloading(percent) => {
-            language.format("updateDownloading", &[("percent", &percent.to_string())])
-        }
-        InstallStatus::Installing(_) => language.t("updateInstalling").to_owned(),
-        InstallStatus::Failed(_) => language.t("updateFailed").to_owned(),
-    }
-}
-
 struct Row<'a> {
     target: Target,
     rect: Rect,
@@ -1766,11 +1807,18 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
         } else {
             (row.rect.h - 29.12) / 2.
         };
-    let compact_value_width = matches!(
+    let compact_value_width = if matches!(
         row.target,
-        Target::WallpaperCycle | Target::WallpaperGradient
-    )
-    .then(|| rotation_value_width(assets, state.preferences.language));
+        Target::InterfaceStyle | Target::GlassTransparency | Target::GlassPreset(_)
+    ) {
+        Some(460.)
+    } else {
+        matches!(
+            row.target,
+            Target::WallpaperCycle | Target::WallpaperGradient
+        )
+        .then(|| rotation_value_width(assets, state.preferences.language))
+    };
     let right_inset = if let Some(width) = compact_value_width {
         width + 24.2 + 24.
     } else if row.value.is_some() {
@@ -2093,11 +2141,15 @@ fn settings(out: &mut Scene, state: &State, assets: &Assets) {
 
 fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
-    for (index, key) in ["interface", "background", "widgets", "system"]
+    for (index, key) in ["interface", "background", "widgets", "system", "Appearance"]
         .into_iter()
         .enumerate()
     {
-        let label = language.t(key);
+        let label = if key == "Appearance" {
+            key
+        } else {
+            language.t(key)
+        };
         let rect = Rect::new(160., 164.8 + index as f32 * 84., 403.2, 72.);
         let focused = state.focus == Target::Sidebar(index);
         out.pill(rect, focused, state.section == index);
@@ -2218,6 +2270,10 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
 fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
     let language = state.preferences.language;
     let s = state.scroll;
+    if state.section == crate::state::APPEARANCE_SECTION {
+        appearance_settings(out, state, assets);
+        return;
+    }
     if let Some(subpage) = &state.subpage {
         let start = out.draw.len();
         if matches!(
@@ -2592,7 +2648,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                         Target::CheckUpdates
                     },
                     rect: Rect::new(rect.x + 24., rect.y + 132., rect.w - 48., 64.),
-                    title: &update_value(state),
+                    title: "Self-update disabled · install fork updates manually",
                     icon: Some(if state.available_update.is_some() {
                         "arrow"
                     } else {
@@ -3554,6 +3610,93 @@ fn full_screen_fill(draw: &Draw) -> bool {
         Draw::Shape(rect, radius, border, _) => whole(rect) && *radius <= 0. && *border <= 0.,
         Draw::RoundedGradient(rect, radius, ..) => whole(rect) && *radius <= 0.,
         _ => false,
+    }
+}
+
+/// Appearance is intentionally independent of the original General settings layout.
+fn appearance_settings(out: &mut Scene, state: &State, assets: &Assets) {
+    use crate::model::InterfaceStyle;
+    let glass = state.preferences.interface_style == InterfaceStyle::LiquidGlass;
+    let style = if glass {
+        "Liquid Glass"
+    } else {
+        "Original Luma"
+    };
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::InterfaceStyle,
+            rect: Rect::new(640., 164.8, 1120., 84.),
+            title: "Interface Style",
+            icon: Some("sparkles"),
+            value: Some(style),
+            description: None,
+            selected: false,
+            chevron: true,
+        },
+    );
+    if !glass {
+        return;
+    }
+    let value = state.preferences.glass_transparency;
+    let label = format!("{value}%  ·  Left / Right: 5%");
+    row(
+        out,
+        state,
+        assets,
+        Row {
+            target: Target::GlassTransparency,
+            rect: Rect::new(640., 268.8, 1120., 104.),
+            title: "Glass Transparency",
+            icon: Some("eye"),
+            value: Some(&label),
+            description: None,
+            selected: false,
+            chevron: false,
+        },
+    );
+    let track = Rect::new(684., 352., 1032., 4.);
+    out.shape(track, 2., c(0xffffff, 0.22));
+    out.shape(
+        Rect::new(track.x, track.y, track.w * value as f32 / 100., 4.),
+        2.,
+        c(0xb8e2ff, 1.),
+    );
+    out.shape(
+        Rect::new(
+            track.x + track.w * value as f32 / 100. - 8.,
+            track.y - 6.,
+            16.,
+            16.,
+        ),
+        8.,
+        WHITE,
+    );
+    for (index, (value, title, detail)) in [
+        (0, "Crystal", "Crystal Clear · maximum transparency"),
+        (55, "Balanced", "Default · balanced contrast"),
+        (100, "Frosted", "Maximum opacity"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        row(
+            out,
+            state,
+            assets,
+            Row {
+                target: Target::GlassPreset(value),
+                rect: Rect::new(640., 400. + index as f32 * 84., 1120., 72.),
+                title,
+                icon: Some("sparkles"),
+                value: Some(detail),
+                description: None,
+                selected: state.preferences.glass_transparency == value,
+                chevron: false,
+            },
+        );
     }
 }
 
