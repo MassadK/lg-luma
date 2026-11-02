@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: liquid-glass-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   standalone:
     runs-on: ubuntu-24.04
