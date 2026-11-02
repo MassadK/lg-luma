@@ -1,4 +1,4 @@
-name: Liquid Glass standalone build
+name: Liquid Glass build and Homebrew release
 on:
   push:
     branches: [liquid-glass]
@@ -10,6 +10,8 @@ jobs:
   standalone:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -20,7 +22,7 @@ jobs:
         with:
           targets: armv7-unknown-linux-gnueabi
           components: rustfmt, clippy
-      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev pkg-config woff2 python3-fonttools xvfb libgl1-mesa-dri
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev pkg-config woff2 python3-fonttools xvfb xauth libgl1-mesa-dri
       - run: pnpm install --frozen-lockfile
       - run: cargo fmt --all -- --check
       - run: pnpm test
@@ -31,10 +33,31 @@ jobs:
       - run: pnpm build && node tools/package.mjs
         env:
           WEBOS_NDK: ${{ github.workspace }}/.build/toolchain/arm-webos-linux-gnueabi_sdk-buildroot
+      - name: Generate Homebrew repository feed
+        run: node tools/homebrew-feed.mjs
       - uses: actions/upload-artifact@v6
         with:
           name: Luma-Liquid-Glass-0.1.0-standalone
           path: |
             dist/*.ipk
             dist/sha256sums
+            dist/repo.json
+            dist/description.html
+            dist/app-icon-large.png
           retention-days: 30
+      - name: Publish Liquid Glass release
+        if: github.ref == 'refs/heads/liquid-glass' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          tag="liquid-glass-v$(node -p 'require("./appinfo.json").version')"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists; leave published files unchanged. Bump the app version for another release."
+            exit 0
+          fi
+          gh release create "$tag" dist/*.ipk dist/sha256sums dist/repo.json dist/description.html dist/app-icon-large.png \
+            --target "$COMMIT_SHA" --title "Luma Liquid Glass ${tag#liquid-glass-v}" --latest \
+            --notes "Native standalone Liquid Glass launcher. LG C1 hardware verification remains pending. Home-button mapping can be configured separately with LG Input Hook; system Home takeover and boot autostart are disabled."
+          echo "Homebrew repository: https://github.com/$GH_REPO/releases/latest/download/repo.json" >> "$GITHUB_STEP_SUMMARY"
