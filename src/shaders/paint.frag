@@ -72,14 +72,19 @@ void main() {
         // and a broad inner glow across the bezel.
         vec2 light = normalize(vec2(-0.55, -0.83));
         float facing = dot(n, light);
-        float line = 1.0 - smoothstep(0.0, 1.2 + u_aa * 1.5, inside);
+        float line = 1.0 - smoothstep(0.0, 1.6 + u_aa * 1.5, inside);
+        line *= line;
         float glow = (1.0 - t) * (1.0 - t);
         float lit = max(facing, 0.0);
         float back = max(-facing, 0.0);
         lit *= lit;
         back *= back;
-        float spec = line * (0.07 + 0.95 * lit + 0.55 * back)
-            + glow * (0.13 * lit + 0.06 * back + 0.02);
+        // Light catches the curved corners; long straight sides only keep a faint edge, as
+        // a uniform line there reads as a drawn stroke rather than a glass rim.
+        float arc = smoothstep(0.0, 1.0, clamp(abs(n.x * n.y) * 2.0, 0.0, 1.0));
+        float catchlight = (0.95 * lit + 0.55 * back) * mix(0.16, 1.0, arc);
+        float spec = line * (0.05 + catchlight)
+            + glow * (0.13 * lit + 0.06 * back) * mix(0.25, 1.0, arc) + glow * 0.015;
         spec *= u_glass.y;
         // A faint sheen over the top half of the body.
         float y = v_shape.y / (2.0 * half_size.y) + 0.5;
