@@ -810,12 +810,25 @@ fn header(
         out.border(nav, 48., 1., c(0xffffff, 0.07));
     } else {
         out.shadow(nav, 48., 24., 6., 0.10);
-        out.glass(nav, 48., Material::Regular);
+        // iOS 27 segment tracks are flat glass with only the darkened edge: no light rim, so
+        // the band of track around the selected segment reads clearly.
+        let track = Material::Regular.glass(out.frost);
+        out.draw.push(Draw::Glass(
+            nav,
+            48.,
+            Glass {
+                shine: 0.12,
+                ..track
+            },
+        ));
     }
     let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
     if !out.classic {
-        // iOS 27 text segments nearly fill their track: about 6% of its height on each side.
-        let inset = 4.4;
+        // Measured from iOS 27 Safari's segmented tabs: the selected segment sits 6.1% of the
+        // track's height inside it, edge to edge, the same above, below and at the ends, and
+        // is concentric with it (both are capsules).
+        let inset = nav.h * 0.061;
+        // Tab items sit 9.8 inside the track; widen the segment so its ends keep that inset.
         let grow = 9.8 - inset;
         let segment = Rect::new(
             pill.x - grow,
@@ -909,9 +922,9 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, segment: Rect
         );
     }
     let (cx, cy) = (segment.x + segment.w / 2., segment.y + segment.h / 2.);
-    let lift = if focused { 3. } else { 0. };
-    let w = (segment.w + lift * 2. + 16. * lens) * (1. + stretch);
-    let h = (segment.h + lift + 10. * lens) * (1. - 0.3 * stretch);
+    // Remote focus brightens the segment but never grows it, so its gap to the track holds.
+    let w = (segment.w + 16. * lens) * (1. + stretch);
+    let h = (segment.h + 10. * lens) * (1. - 0.3 * stretch);
     let selection = Rect::new(cx - w / 2., cy - h / 2., w, h);
     let radius = h / 2.;
     out.shadow(
