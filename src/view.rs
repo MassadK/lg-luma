@@ -539,6 +539,8 @@ impl Material {
             shine,
             opacity: 1.,
             lens: 0.,
+            light: 0.,
+            dispersion: 0.,
         }
     }
 }
@@ -931,6 +933,10 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
             ],
             shine: mix(rest.shine, 1.7),
             lens,
+            // The highlight swings toward the direction of travel; the rim splits into colour
+            // only while lifted, so a resting selection stays a quiet frosted pill.
+            light: (state.nav_velocity / 2600.).clamp(-0.7, 0.7),
+            dispersion: lens * lens,
             ..rest
         },
     ));
@@ -967,6 +973,31 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
         let (lx, ly) = (rect.x + rect.w / 2., rect.y + rect.h / 2.);
         let (mx, my) = (cx + (lx - cx) * magnify, cy + (ly - cy) * magnify);
         let (mw, mh) = (rect.w * magnify, rect.h * magnify);
+        // Labels nearer the lens rim split into faint spectral copies, red outward and violet
+        // inward, the way bright edges seen through the rim of real glass do.
+        let rim = ((mx - cx).abs() / (w / 2.)).clamp(0., 1.);
+        let fringe = rim.powf(1.4) * lens * lens;
+        if moving && fringe > 0.02 {
+            let outward = (mx - cx).signum();
+            let spread = 4.5 * fringe;
+            for (t, hue) in [
+                (1.0, c(0xff3b30, 1.)),
+                (0.5, c(0xffcc00, 1.)),
+                (0.0, c(0x34c759, 1.)),
+                (-0.5, c(0x32ade6, 1.)),
+                (-1.0, c(0x8e5cff, 1.)),
+            ] {
+                let mut tint = hue;
+                tint[3] = 0.26 * fringe;
+                out.text(
+                    language.t(key),
+                    Rect::new(mx - mw / 2. + outward * t * spread, my - mh / 2., mw, mh),
+                    text(20.8 * magnify, 550, -0.02),
+                    tint,
+                    true,
+                );
+            }
+        }
         out.text(
             language.t(key),
             Rect::new(mx - mw / 2., my - mh / 2., mw, mh),

@@ -7,6 +7,8 @@ uniform vec3 u_app_bottom;
 uniform bool u_app;
 // Liquid Glass: [body, shine, opacity, lens]; body < 0 is off.
 uniform vec4 u_glass;
+// [light rotation in radians, rim dispersion 0..1].
+uniform vec2 u_glass_fx;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
 varying PAINT_PRECISION vec4 v_shape;
@@ -75,7 +77,10 @@ void main() {
         // Specular rim: one continuous hairline whose brightness follows a smooth diagonal
         // gradient across the whole shape (lit upper left, a softer echo lower right), so it
         // never jumps where straight sides meet the corners.
-        vec2 light = normalize(vec2(-0.55, -0.83));
+        float turn = u_glass_fx.x;
+        vec2 light = vec2(-0.55, -0.83);
+        light = normalize(vec2(light.x * cos(turn) - light.y * sin(turn),
+            light.x * sin(turn) + light.y * cos(turn)));
         vec2 across = v_shape.xy / max(half_size, vec2(1.0));
         float g = dot(across, light) / 1.38;
         float lit = smoothstep(0.0, 1.0, g);
@@ -85,11 +90,28 @@ void main() {
         float spec = line * (0.11 + 0.55 * lit + 0.24 * back)
             + sheen_band * (0.025 + 0.05 * lit);
         spec *= u_glass.y;
+        // Dispersion: a lens bends each wavelength by a different amount, so the white rim
+        // light separates - red lands outermost, blue innermost - leaving a white core with
+        // warm and cool fringes. Only the colour separation is added (it averages to zero), so
+        // brightness stays the rim's own; it is strongest where the rim is lit and on the
+        // curved ends a moving lens leads and trails with, as on iOS 26 tab bars.
+        vec3 prism = vec3(0.0);
+        float dispersion = u_glass_fx.y;
+        if (dispersion > 0.0) {
+            float spread_px = 1.2 * dispersion;
+            float band_w = 1.3 + u_aa;
+            vec3 shifted = (vec3(inside) - vec3(0.6, 0.6 + spread_px, 0.6 + 2.0 * spread_px)) / band_w;
+            vec3 lobe = exp(-shifted * shifted);
+            vec3 chroma = lobe - vec3(dot(lobe, vec3(1.0 / 3.0)));
+            float ends = mix(0.15, 1.0, n.x * n.x);
+            float light_here = (0.3 + 1.0 * lit + 0.55 * back) * ends;
+            prism = chroma * light_here * dispersion * 0.7 * u_glass.y;
+        }
         // A faint sheen over the top half of the body.
         float y = v_shape.y / (2.0 * half_size.y) + 0.5;
         float sheen = 0.05 * (1.0 - smoothstep(0.0, 0.55, y)) * u_glass.y;
-        vec3 body = clamp(bg + vec3(spec + sheen), 0.0, 1.0);
-        float rim_alpha = clamp(spec * 1.1, 0.0, 1.0);
+        vec3 body = clamp(bg + vec3(spec + sheen) + prism, 0.0, 1.0);
+        float rim_alpha = clamp(spec * 1.1 + dot(prism, vec3(0.33)), 0.0, 1.0);
         vec4 glass = mix(vec4(1.0, 1.0, 1.0, rim_alpha), vec4(body, 1.0), u_glass.x);
         gl_FragColor = vec4(glass.rgb, glass.a * alpha * u_glass.z * edge_coverage());
         return;

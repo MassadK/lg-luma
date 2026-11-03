@@ -1718,6 +1718,7 @@ fn run() -> Result<(), String> {
             width_velocity = 0.;
             state.nav_lens = 0.;
             state.nav_stretch = 0.;
+            state.nav_velocity = 0.;
         } else if state.preferences.classic_look {
             pill += (target - pill) * (1. - (-20. * dt).exp());
             pill_width += (target_width - pill_width) * (1. - (-20. * dt).exp());
@@ -1740,6 +1741,7 @@ fn run() -> Result<(), String> {
             let (goal, rate) = if travelling { (1., 26.) } else { (0., 11.) };
             state.nav_lens += (goal - state.nav_lens) * (1. - (-rate * dt).exp());
             state.nav_stretch = (pill_velocity.abs() / 3200.).min(0.22);
+            state.nav_velocity = pill_velocity;
             state.dirty = true;
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)

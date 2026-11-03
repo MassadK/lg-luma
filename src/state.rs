@@ -242,6 +242,8 @@ pub struct State {
     /// much its speed stretches it. Set by the frame loop each frame.
     pub nav_lens: f32,
     pub nav_stretch: f32,
+    /// Signed horizontal speed of the tab selection, in logical pixels per second.
+    pub nav_velocity: f32,
     pub pointer: bool,
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
@@ -288,6 +290,7 @@ impl State {
             dirty: true,
             nav_lens: 0.,
             nav_stretch: 0.,
+            nav_velocity: 0.,
             pointer: false,
             pressed: None,
             previous_background: None,

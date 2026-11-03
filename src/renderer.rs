@@ -92,6 +92,10 @@ pub struct Glass {
     /// 0 for a resting surface, 1 for a lifted lens: stronger refraction, magnification
     /// and dispersion, as the iOS 26 tab selection shows while it moves.
     pub lens: f32,
+    /// Turns the light source by this many radians, so a moving lens carries its highlight.
+    pub light: f32,
+    /// Prismatic dispersion at the rim, 0 to 1: a spectral band, red outside to violet inside.
+    pub dispersion: f32,
 }
 
 struct Texture {
@@ -209,7 +213,7 @@ enum BatchKind {
         start: usize,
         count: usize,
         backdrop: Option<[[u8; 3]; 2]>,
-        glass: Option<[f32; 4]>,
+        glass: Option<[f32; 6]>,
     },
     Vector {
         path: String,
@@ -665,7 +669,7 @@ impl Renderer {
         count: usize,
         texture: GLuint,
         backdrop: Option<[[u8; 3]; 2]>,
-        glass: Option<[f32; 4]>,
+        glass: Option<[f32; 6]>,
     ) {
         if let Some(batch) = self.batches.last_mut() {
             let same_clip = match (batch.clip, self.clip) {
@@ -1186,7 +1190,14 @@ impl Renderer {
             6,
             texture,
             None,
-            Some([glass.body, glass.shine, glass.opacity, glass.lens]),
+            Some([
+                glass.body,
+                glass.shine,
+                glass.opacity,
+                glass.lens,
+                glass.light,
+                glass.dispersion,
+            ]),
         );
     }
 
@@ -1572,7 +1583,13 @@ impl Renderer {
                             gl::GetUniformLocation(self.program, c"u_app".as_ptr()),
                             i32::from(backdrop.is_some()),
                         );
-                        let [body, shine, opacity, lens] = glass.unwrap_or([-1., 0., 0., 0.]);
+                        let [body, shine, opacity, lens, light, dispersion] =
+                            glass.unwrap_or([-1., 0., 0., 0., 0., 0.]);
+                        gl::Uniform2f(
+                            gl::GetUniformLocation(self.program, c"u_glass_fx".as_ptr()),
+                            light,
+                            dispersion,
+                        );
                         gl::Uniform4f(
                             gl::GetUniformLocation(self.program, c"u_glass".as_ptr()),
                             body,
