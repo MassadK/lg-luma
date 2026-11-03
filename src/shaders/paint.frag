@@ -68,23 +68,18 @@ void main() {
         float luma = dot(bg, vec3(0.2126, 0.7152, 0.0722));
         bg = clamp(mix(vec3(luma), bg, 1.35) * 1.02 + 0.01, 0.0, 1.0);
         bg = mix(bg, v_color.rgb, v_color.a);
-        // Specular: a hairline rim lit from the upper left, with a softer echo opposite
-        // and a broad inner glow across the bezel.
+        // Specular rim: one continuous hairline whose brightness follows a smooth diagonal
+        // gradient across the whole shape (lit upper left, a softer echo lower right), so it
+        // never jumps where straight sides meet the corners.
         vec2 light = normalize(vec2(-0.55, -0.83));
-        float facing = dot(n, light);
-        float line = 1.0 - smoothstep(0.0, 1.6 + u_aa * 1.5, inside);
-        line *= line;
-        float glow = (1.0 - t) * (1.0 - t);
-        float lit = max(facing, 0.0);
-        float back = max(-facing, 0.0);
-        lit *= lit;
-        back *= back;
-        // Light catches the curved corners; long straight sides only keep a faint edge, as
-        // a uniform line there reads as a drawn stroke rather than a glass rim.
-        float arc = smoothstep(0.0, 1.0, clamp(abs(n.x * n.y) * 2.0, 0.0, 1.0));
-        float catchlight = (0.95 * lit + 0.55 * back) * mix(0.16, 1.0, arc);
-        float spec = line * (0.05 + catchlight)
-            + glow * (0.13 * lit + 0.06 * back) * mix(0.25, 1.0, arc) + glow * 0.015;
+        vec2 across = v_shape.xy / max(half_size, vec2(1.0));
+        float g = dot(across, light) / 1.38;
+        float lit = smoothstep(0.0, 1.0, g);
+        float back = smoothstep(0.0, 1.0, -g);
+        float line = 1.0 - smoothstep(0.0, 1.5 + u_aa * 1.5, inside);
+        float sheen_band = 1.0 - smoothstep(0.0, 7.0, inside);
+        float spec = line * (0.11 + 0.55 * lit + 0.24 * back)
+            + sheen_band * (0.025 + 0.05 * lit);
         spec *= u_glass.y;
         // A faint sheen over the top half of the body.
         float y = v_shape.y / (2.0 * half_size.y) + 0.5;
