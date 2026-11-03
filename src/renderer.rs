@@ -73,6 +73,22 @@ pub enum Draw {
     EdgeFade(Option<[f32; 4]>),
     /// Horizontal counterpart: [left fade-in start, end, right fade-out start, end].
     EdgeFadeX(Option<[f32; 4]>),
+    /// Liquid Glass: the wallpaper behind the shape, blurred, refracted through a rounded
+    /// lens rim, saturated, tinted and lit by a specular edge.
+    Glass(Rect, f32, Glass),
+}
+
+/// Parameters of the Liquid Glass material.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Glass {
+    /// Colour mixed over the refracted backdrop; alpha is the mix amount.
+    pub tint: Color,
+    /// 1 draws the full material; 0 only its lit rim, as an overlay for opaque artwork.
+    pub body: f32,
+    /// Specular rim strength.
+    pub shine: f32,
+    /// Overall opacity, for fades.
+    pub opacity: f32,
 }
 
 struct Texture {
@@ -190,6 +206,7 @@ enum BatchKind {
         start: usize,
         count: usize,
         backdrop: Option<[[u8; 3]; 2]>,
+        glass: Option<[f32; 3]>,
     },
     Vector {
         path: String,
@@ -209,6 +226,16 @@ struct Batch {
     // [top fade-in, top end, bottom start, bottom fade-out, left ×2, right ×2]; 0 = off.
     fade: Option<[f32; 8]>,
 }
+
+struct GlassBackdrop {
+    source: String,
+    blurred: image::RgbaImage,
+    fold: Option<Vec<[f32; 6]>>,
+    texture: Texture,
+}
+
+const GLASS_BACKDROP: [u32; 2] = [480, 270];
+const GLASS_BLUR_SIGMA: f32 = 5.;
 
 fn full_screen(rect: &Rect) -> bool {
     rect.x <= 0. && rect.y <= 0. && rect.x + rect.w >= 1920. && rect.y + rect.h >= 1080.
@@ -297,6 +324,7 @@ fn profile_skip(command: &Draw) -> bool {
         Draw::Shape(..) => "shape",
         Draw::RoundedGradient(..) => "gradient",
         Draw::Shadow(..) => "shadow",
+        Draw::Glass(..) => "glass",
         Draw::Text(..) => "text",
         Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => return false,
     };
@@ -347,6 +375,13 @@ pub struct Renderer {
     fade: Option<[f32; 8]>,
     frame: u64,
     stats: RenderStats,
+    /// Wallpaper the glass refracts this frame, and its scrims as p * m + k at top and bottom.
+    glass_source: Option<String>,
+    /// Scrims over the wallpaper as p * m + k per backdrop row, None when there are none.
+    glass_fold: Option<Vec<[f32; 6]>>,
+    /// Pre-blurred, downscaled copy of `glass_source`, and the folded texture last uploaded.
+    glass_backdrop: Option<GlassBackdrop>,
+    glass_fallback: Texture,
     pub info: GraphicsInfo,
 }
 
@@ -445,6 +480,7 @@ impl Renderer {
             gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
         }
         let white = texture(1, 1, &[255; 4]);
+        let glass_fallback = texture(1, 1, &[34, 38, 44, 255]);
         Ok(Self {
             program,
             vector_program,
@@ -467,6 +503,10 @@ impl Renderer {
             fade: None,
             frame: 0,
             stats: RenderStats::new(Size::HD),
+            glass_source: None,
+            glass_fold: None,
+            glass_backdrop: None,
+            glass_fallback,
             info: GraphicsInfo {
                 vendor: gl_string(gl::VENDOR),
                 renderer: gl_string(gl::RENDERER),
@@ -611,7 +651,7 @@ impl Renderer {
                 border,
             ]);
         }
-        self.paint_batch(start, 6, texture, backdrop);
+        self.paint_batch(start, 6, texture, backdrop, None);
     }
 
     /// Appends `count` paint vertices from `start`, merged into the previous batch when it uses
@@ -622,6 +662,7 @@ impl Renderer {
         count: usize,
         texture: GLuint,
         backdrop: Option<[[u8; 3]; 2]>,
+        glass: Option<[f32; 3]>,
     ) {
         if let Some(batch) = self.batches.last_mut() {
             let same_clip = match (batch.clip, self.clip) {
@@ -635,10 +676,12 @@ impl Renderer {
                     texture: previous,
                     count: batch_count,
                     backdrop: previous_backdrop,
+                    glass: previous_glass,
                     ..
                 } = &mut batch.kind
                 && *previous == texture
                 && *previous_backdrop == backdrop
+                && *previous_glass == glass
             {
                 *batch_count += count;
                 return;
@@ -650,6 +693,7 @@ impl Renderer {
                 start,
                 count,
                 backdrop,
+                glass,
             },
             clip: self.clip,
             fade: self.fade,
@@ -672,6 +716,15 @@ impl Renderer {
             }
             (m, k)
         };
+        let rows = GLASS_BACKDROP[1];
+        self.glass_fold = Some(
+            (0..rows)
+                .map(|row| {
+                    let (m, k) = fold((row as f32 + 0.5) / rows as f32);
+                    [m[0], m[1], m[2], k[0], k[1], k[2]]
+                })
+                .collect(),
+        );
         let start = self.vertices.len() / 14;
         for strip in 0..STRIPS {
             let rows = [
@@ -700,7 +753,7 @@ impl Renderer {
                 ]);
             }
         }
-        self.paint_batch(start, STRIPS * 6, texture, None);
+        self.paint_batch(start, STRIPS * 6, texture, None, None);
     }
 
     fn text(&mut self, text: &str, rect: Rect, style: TextStyle, color: Color, centered: bool) {
@@ -1028,6 +1081,112 @@ impl Renderer {
         }
     }
 
+    /// The blurred wallpaper the glass refracts, with this frame's scrims folded into each row.
+    /// The blur is redone only for a new wallpaper; scrim changes re-fold the small copy.
+    fn glass_texture(&mut self) -> GLuint {
+        let Some(source) = self.glass_source.clone() else {
+            return self.glass_fallback.id;
+        };
+        let started = Instant::now();
+        if self
+            .glass_backdrop
+            .as_ref()
+            .is_none_or(|b| b.source != source)
+        {
+            let Ok(image) = image::open(&source) else {
+                return self.glass_fallback.id;
+            };
+            // A small copy blurred on the CPU once: the shader then needs one bilinear tap per
+            // channel instead of a multi-pass blur every frame.
+            let small = image::imageops::resize(
+                &image.into_rgba8(),
+                GLASS_BACKDROP[0],
+                GLASS_BACKDROP[1],
+                image::imageops::FilterType::Triangle,
+            );
+            let blurred = image::imageops::blur(&small, GLASS_BLUR_SIGMA);
+            let texture = texture(blurred.width(), blurred.height(), &[]);
+            self.glass_backdrop = Some(GlassBackdrop {
+                source,
+                blurred,
+                fold: Some(Vec::new()),
+                texture,
+            });
+        }
+        let backdrop = self.glass_backdrop.as_mut().expect("backdrop loaded above");
+        if backdrop.fold != self.glass_fold {
+            let mut pixels = backdrop.blurred.clone();
+            if let Some(rows) = &self.glass_fold {
+                for (y, row) in pixels.rows_mut().enumerate() {
+                    let f = rows[y.min(rows.len() - 1)];
+                    for pixel in row {
+                        for i in 0..3 {
+                            let value = f32::from(pixel[i]) * f[i] + f[i + 3] * 255.;
+                            pixel[i] = value.round().clamp(0., 255.) as u8;
+                        }
+                    }
+                }
+            }
+            unsafe {
+                gl::BindTexture(gl::TEXTURE_2D, backdrop.texture.id);
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGBA as i32,
+                    pixels.width() as i32,
+                    pixels.height() as i32,
+                    0,
+                    gl::RGBA,
+                    gl::UNSIGNED_BYTE,
+                    pixels.as_raw().as_ptr().cast(),
+                );
+            }
+            backdrop.fold = self.glass_fold.clone();
+            self.stats.image_load_ms += started.elapsed().as_secs_f64() * 1000.;
+        }
+        backdrop.texture.id
+    }
+
+    fn glass(&mut self, rect: Rect, radius: f32, glass: Glass) {
+        if rect.w <= 0. || rect.h <= 0. || glass.opacity <= 0. {
+            return;
+        }
+        let texture = if glass.body > 0. {
+            self.glass_texture()
+        } else {
+            self.white.id
+        };
+        let rect = self.snap(rect);
+        let start = self.vertices.len() / 14;
+        let radius = radius.max(0.5).min(rect.w.min(rect.h) / 2.);
+        for (x, y) in [(0., 0.), (1., 0.), (0., 1.), (0., 1.), (1., 0.), (1., 1.)] {
+            let (px, py) = (rect.x + x * rect.w, rect.y + y * rect.h);
+            self.vertices.extend_from_slice(&[
+                px,
+                py,
+                px / 1920.,
+                py / 1080.,
+                glass.tint[0],
+                glass.tint[1],
+                glass.tint[2],
+                glass.tint[3],
+                (x - 0.5) * rect.w,
+                (y - 0.5) * rect.h,
+                rect.w / 2.,
+                rect.h / 2.,
+                radius,
+                0.,
+            ]);
+        }
+        self.paint_batch(
+            start,
+            6,
+            texture,
+            None,
+            Some([glass.body, glass.shine, glass.opacity]),
+        );
+    }
+
     /// Edges on whole drawable pixels. The TV scales its 1080p graphics plane up 2x, which
     /// turns a half-covered edge pixel into a soft 2-pixel band; whole pixels stay crisp.
     /// LUMA_SNAP=0 keeps logical positions (for comparison).
@@ -1200,12 +1359,19 @@ impl Renderer {
         self.batches.clear();
         self.clip = None;
         self.fade = None;
+        self.glass_source = None;
+        self.glass_fold = None;
         let mut index = 0;
         while index < commands.len() {
             let command = &commands[index];
             index += 1;
             if profile_skip(command) {
                 continue;
+            }
+            if let Some(path) = plain_wallpaper(command)
+                && self.glass_source.is_none()
+            {
+                self.glass_source = Some(path.to_owned());
             }
             if let Some(path) = plain_wallpaper(command)
                 && self.clip.is_none()
@@ -1272,6 +1438,7 @@ impl Renderer {
                 Draw::AppImage(image, rect, radius, tint) => {
                     self.app_image(image, *rect, *radius, *tint)
                 }
+                Draw::Glass(rect, radius, glass) => self.glass(*rect, *radius, *glass),
                 Draw::Clip(clip) => self.clip = *clip,
                 Draw::EdgeFade(fade) => self.set_fade(0, *fade),
                 Draw::EdgeFadeX(fade) => self.set_fade(4, *fade),
@@ -1377,6 +1544,7 @@ impl Renderer {
                         start,
                         count,
                         backdrop,
+                        glass,
                     } => {
                         if !paint_bound {
                             gl::UseProgram(self.program);
@@ -1400,6 +1568,13 @@ impl Renderer {
                         gl::Uniform1i(
                             gl::GetUniformLocation(self.program, c"u_app".as_ptr()),
                             i32::from(backdrop.is_some()),
+                        );
+                        let [body, shine, opacity] = glass.unwrap_or([-1., 0., 0.]);
+                        gl::Uniform3f(
+                            gl::GetUniformLocation(self.program, c"u_glass".as_ptr()),
+                            body,
+                            shine,
+                            opacity,
                         );
                         if let Some(stops) = backdrop {
                             for (name, rgb) in

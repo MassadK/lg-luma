@@ -2,7 +2,7 @@
 use crate::{
     i18n::Language,
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
-    renderer::{Color, Draw, TextStyle, WHITE},
+    renderer::{Color, Draw, Glass, TextStyle, WHITE},
     state::{
         APPS_COLUMNS, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT, HOME_STRIP_LEFT, HOME_STRIP_RIGHT,
         HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State,
@@ -209,6 +209,9 @@ impl Scene {
             scrollable,
         });
     }
+    fn glass(&mut self, rect: Rect, radius: f32, glass: Glass) {
+        self.draw.push(Draw::Glass(rect, radius, glass));
+    }
     fn ring(&mut self, rect: Rect, radius: f32) {
         self.border(rect.inset(-6.9), radius + 6.9, 3.7, c(0xffffff, 0.10));
         self.border(rect.inset(-3.2), radius + 3.2, 3.2, c(0xf0f0f0, 1.));
@@ -222,26 +225,18 @@ impl Scene {
         ));
     }
     fn pill(&mut self, rect: Rect, focused: bool, selected: bool) {
-        self.shadow(rect, rect.h / 2., 18., 4., 0.06);
-        if focused {
-            self.draw.push(Draw::RoundedGradient(
-                rect,
-                rect.h / 2.,
-                c(0xfafafa, 1.),
-                c(0xe5e5e5, 1.),
-            ));
-        } else {
-            self.shape(
-                rect,
-                rect.h / 2.,
-                if selected {
-                    c(0x303438, 1.)
-                } else {
-                    c(0x171c20, 0.72)
-                },
-            );
-            self.border(rect, rect.h / 2., 1., c(0xffffff, 0.07));
-        }
+        self.shadow(rect, rect.h / 2., 18., 4., 0.08);
+        self.glass(
+            rect,
+            rect.h / 2.,
+            if focused {
+                GLASS_FOCUS
+            } else if selected {
+                GLASS_SELECTED
+            } else {
+                GLASS
+            },
+        );
     }
     fn fade(&mut self, from: usize, alpha: f32, brightness: f32) {
         for draw in &mut self.draw[from..] {
@@ -269,6 +264,12 @@ impl Scene {
                         *contain,
                         [brightness, brightness, brightness, alpha],
                     );
+                }
+                Draw::Glass(_, _, glass) => {
+                    for channel in &mut glass.tint[..3] {
+                        *channel *= brightness;
+                    }
+                    glass.opacity *= alpha;
                 }
                 Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
             }
@@ -463,6 +464,40 @@ fn companion(
     );
     out.control(Target::CloseDialog, close, false);
 }
+
+/// Liquid Glass materials. Regular glass is mostly clear with a light dark tint so the
+/// wallpaper's colour carries through; focus is a bright lens; panels are heavier.
+const GLASS: Glass = Glass {
+    tint: [0.06, 0.07, 0.09, 0.36],
+    body: 1.,
+    shine: 1.,
+    opacity: 1.,
+};
+const GLASS_SELECTED: Glass = Glass {
+    tint: [0.62, 0.66, 0.70, 0.30],
+    body: 1.,
+    shine: 1.25,
+    opacity: 1.,
+};
+const GLASS_FOCUS: Glass = Glass {
+    tint: [0.96, 0.965, 0.975, 0.84],
+    body: 1.,
+    shine: 1.3,
+    opacity: 1.,
+};
+const GLASS_PANEL: Glass = Glass {
+    tint: [0.10, 0.11, 0.13, 0.62],
+    body: 1.,
+    shine: 1.,
+    opacity: 1.,
+};
+/// The lit rim alone, laid over opaque artwork such as app cards.
+const GLASS_RIM: Glass = Glass {
+    tint: [0.; 4],
+    body: 0.,
+    shine: 1.,
+    opacity: 1.,
+};
 
 fn c(rgb: u32, alpha: f32) -> Color {
     [
@@ -721,16 +756,10 @@ fn header(
     );
     let layout = navigation(assets, language);
     let nav = layout.surface;
-    out.shadow(nav, 48., 18., 4., 0.06);
-    out.shape(nav, 48., c(0x171c20, 0.72));
-    out.border(nav, 48., 1., c(0xffffff, 0.07));
+    out.shadow(nav, 48., 24., 6., 0.10);
+    out.glass(nav, 48., GLASS);
     let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
-    out.draw.push(Draw::RoundedGradient(
-        pill,
-        32.,
-        c(0xfafafa, 1.),
-        c(0xe5e5e5, 1.),
-    ));
+    out.glass(pill, 32., GLASS_FOCUS);
     if matches!(state.focus, Target::Nav(_)) && !state.pointer {
         // Follow the pill's animated position and width instead of jumping to
         // the destination tab's control rectangle.
@@ -825,6 +854,14 @@ fn tile(
         if focused { 0.4 } else { 0.165 },
     );
     let favorite_color = app_face(out, assets, app, rect, state.preferences.language, 19.2);
+    out.glass(
+        rect,
+        19.2,
+        Glass {
+            shine: if focused { 1.1 } else { 0.6 },
+            ..GLASS_RIM
+        },
+    );
     if pinned {
         favorite_badge(out, assets, rect, favorite_color);
     }
@@ -1274,26 +1311,7 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             if focused { 14. } else { 1. },
             if focused { 0.4 } else { 0.01 },
         );
-        out.draw.push(Draw::RoundedGradient(
-            rect,
-            18.4,
-            if focused {
-                c(0x30363c, 0.70)
-            } else {
-                c(0x20252b, 0.60)
-            },
-            if focused {
-                c(0x242a30, 0.65)
-            } else {
-                c(0x171c22, 0.55)
-            },
-        ));
-        out.border(
-            rect,
-            18.4,
-            1.,
-            c(0xffffff, if focused { 0.24 } else { 0.063 }),
-        );
+        out.glass(rect, 18.4, if focused { GLASS_SELECTED } else { GLASS });
         let art = Rect::new(rect.x + 21., rect.y + 24., 56., 56.);
         out.draw.push(Draw::RoundedGradient(
             art,
@@ -1547,21 +1565,7 @@ fn library_toolbar(out: &mut Scene, state: &State, assets: &Assets) {
     }
     let search = Rect::new(1532., 164.8, 304., 56.);
     let focused = matches!(state.focus, Target::Search | Target::ClearSearch);
-    out.shape(
-        search,
-        48.,
-        if focused {
-            c(0x303438, 1.)
-        } else {
-            c(0x171c20, 0.72)
-        },
-    );
-    out.border(
-        search,
-        48.,
-        1.,
-        c(0xffffff, if focused { 0.70 } else { 0.07 }),
-    );
+    out.glass(search, 48., if focused { GLASS_SELECTED } else { GLASS });
     if focused {
         out.border(search.inset(-3.), 51., 3., c(0xffffff, 0.063));
     }
@@ -1732,12 +1736,7 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     let bright = focused;
     let radius = if row.description.is_some() { 20. } else { 48. };
     if bright {
-        out.draw.push(Draw::RoundedGradient(
-            row.rect,
-            radius,
-            c(0xfafafa, 1.),
-            c(0xe5e5e5, 1.),
-        ));
+        out.glass(row.rect, radius, GLASS_FOCUS);
     } else {
         settings_surface(out, row.rect, radius);
     }
@@ -1941,8 +1940,7 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     let mut y = 164.8 - state.scroll;
     if let Some(place) = &state.preferences.weather_location {
         let rect = Rect::new(640., y, 1120., 76.2);
-        out.shape(rect, 20., c(0x171c20, 0.72));
-        out.border(rect, 20., 1., c(0xffffff, 0.04));
+        out.glass(rect, 20., GLASS);
         out.icon(
             assets,
             "location",
@@ -2012,8 +2010,7 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     );
     out.control(Target::WeatherQuery, query, true);
     let search = Rect::new(1696., y, 64., 64.);
-    out.shape(search, 32., c(0x171c20, 0.72));
-    out.border(search, 32., 1., c(0xffffff, 0.07));
+    out.glass(search, 32., GLASS);
     out.icon(
         assets,
         if state.weather.searching {
@@ -2944,8 +2941,7 @@ fn input_name_rows(out: &mut Scene, state: &State, assets: &Assets, id: &str, y:
 }
 
 fn settings_surface(out: &mut Scene, rect: Rect, radius: f32) {
-    out.shape(rect, radius, c(0x171c20, 0.72));
-    out.border(rect, radius, 1., c(0xffffff, 0.07));
+    out.glass(rect, radius, GLASS);
 }
 
 fn shortcut_settings(out: &mut Scene, state: &State, assets: &Assets) {
@@ -3208,13 +3204,7 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     let panel_start = out.draw.len();
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 120., 25., 0.47);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        27.2,
-        c(0x34383b, 0.96),
-        c(0x24282d, 0.988),
-    ));
-    out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    out.glass(panel, 27.2, GLASS_PANEL);
     let hidden = state.preferences.hidden.iter().any(|item| item == id);
     let actions = if shortcut {
         vec![
@@ -3368,13 +3358,7 @@ fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str
     let panel = Rect::new(640., (1080. - height) / 2., 640., height);
     out.modal = Some(panel);
     out.shadow(panel, 28., 100., 24., 0.47);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        28.,
-        c(0x34383b, 0.98),
-        c(0x24282d, 0.99),
-    ));
-    out.border(panel, 28., 1., c(0xffffff, 0.12));
+    out.glass(panel, 28., GLASS_PANEL);
     out.text(
         body,
         Rect::new(panel.x + 36., panel.y + 36., 568., body_height),
@@ -3444,13 +3428,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     let panel = Rect::new(350., 290., 1220., 530.);
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 90., 20., 0.45);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        27.2,
-        c(0x34383b, 0.98),
-        c(0x24282d, 1.),
-    ));
-    out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    out.glass(panel, 27.2, GLASS_PANEL);
     out.text(
         match state.keyboard_field {
             TextField::Location => language.t("cityPostcode"),
@@ -3469,7 +3447,7 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     if state.focus == Target::CloseDialog {
         out.border(close, 16.8, 2., WHITE);
     }
-    out.shape(Rect::new(389., 390., 1142., 56.), 28., c(0x171c20, 0.72));
+    out.glass(Rect::new(389., 390., 1142., 56.), 28., GLASS);
     out.icon(
         assets,
         "search",
@@ -3525,8 +3503,7 @@ fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     let height = 20. + text_height;
     let rect = Rect::new(960. - width / 2., 1080. - 51.2 - height, width, height);
     out.shadow(rect, 16., 18., 4., 0.06);
-    out.shape(rect, 16., c(0x171c20, 0.72));
-    out.border(rect, 16., 1., c(0xffffff, 0.07));
+    out.glass(rect, 16., GLASS);
     out.text(
         notice,
         Rect::new(rect.x + 20., rect.y + 10., width - 40., text_height),

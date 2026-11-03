@@ -737,8 +737,8 @@ fn input_name_actions_only_highlight_the_focused_row_and_keep_the_saved_mode() {
             .draw
             .iter()
             .filter_map(|draw| match draw {
-                crate::renderer::Draw::RoundedGradient(rect, ..)
-                    if rect.x == 640. && rect.w == 1120. =>
+                crate::renderer::Draw::Glass(rect, _, glass)
+                    if rect.x == 640. && rect.w == 1120. && glass.tint[0] > 0.9 =>
                 {
                     Some(rect.y)
                 }
@@ -779,8 +779,8 @@ fn clock_choices_only_highlight_focus_while_preserving_saved_checkmarks() {
             .draw
             .iter()
             .filter_map(|draw| match draw {
-                crate::renderer::Draw::RoundedGradient(rect, ..)
-                    if rect.x == 640. && rect.w == 1120. =>
+                crate::renderer::Draw::Glass(rect, _, glass)
+                    if rect.x == 640. && rect.w == 1120. && glass.tint[0] > 0.9 =>
                 {
                     Some(rect.y)
                 }
@@ -888,8 +888,8 @@ fn system_version_is_inside_the_update_status_card_without_a_separate_row() {
     let system = scene(&state);
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
-        crate::renderer::Draw::Shape(rect, _, _, color)
-            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 220. && color[3] == 0.72
+        crate::renderer::Draw::Glass(rect, _, glass)
+            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 220. && glass.body == 1.
     )));
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
@@ -1711,8 +1711,8 @@ fn settings_order_language_sort_and_shortcut_empty_card() {
     state.subpage = Some(Subpage::Shortcuts);
     let empty = scene(&state);
     assert!(empty.draw.iter().any(|draw| matches!(draw,
-        Draw::Shape(rect, radius, stroke, color) if rect.x == 640. && rect.y == 248.8 && rect.h == 220.
-            && *radius == 20. && *stroke == 0. && color[3] == 0.72
+        Draw::Glass(rect, radius, glass) if rect.x == 640. && rect.y == 248.8 && rect.h == 220.
+            && *radius == 20. && glass.body == 1.
     )));
     assert!(empty.draw.iter().any(|draw| matches!(draw,
         Draw::Text(label, _, style, ..) if label == state.preferences.language.t("noTiles") && style.size == 24.
@@ -2282,8 +2282,8 @@ fn shortcut_settings_offer_qr_editing_and_a_test_remove_popup() {
     let page = scene(&state);
     assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, _, _, color, _) if label == "Lamp" && color[3] == 0.73)));
     assert!(page.draw.iter().any(|draw| matches!(draw,
-        crate::renderer::Draw::Shape(rect, radius, _, color)
-            if rect.x == 640. && rect.h == 90.7 && *radius == 20. && color[3] == 0.72
+        crate::renderer::Draw::Glass(rect, radius, glass)
+            if rect.x == 640. && rect.h == 90.7 && *radius == 20. && glass.body == 1.
     )));
     assert!(
         !page
@@ -2725,8 +2725,8 @@ fn app_categories_and_search_use_matching_pills_and_larger_heavier_labels() {
         assert_eq!(control.rect.h, 56.);
         assert_eq!(control.rect.y, 164.8);
         assert!(rendered.draw.iter().any(|draw| matches!(draw,
-            Draw::Shape(rect, radius, _, color) if rect.x == control.rect.x && rect.y == control.rect.y
-                && rect.w == control.rect.w && (*radius == 48. || *radius == 28.) && color[3] >= 0.72
+            Draw::Glass(rect, radius, glass) if rect.x == control.rect.x && rect.y == control.rect.y
+                && rect.w == control.rect.w && (*radius == 48. || *radius == 28.) && glass.body == 1.
         )));
         assert!(rendered.draw.iter().any(|draw| matches!(draw,
             Draw::Text(_, rect, style, ..) if rect.x >= control.rect.x && rect.x < control.rect.x + control.rect.w
@@ -2751,7 +2751,8 @@ fn category_focus_active_and_clear_button_share_the_pill_style() {
         .unwrap();
     assert_eq!((clear.rect.w, clear.rect.h), (56., 56.));
     assert!(rendered.draw.iter().any(|draw| matches!(draw,
-        Draw::RoundedGradient(rect, radius, ..) if rect.x == clear.rect.x && rect.y == clear.rect.y && *radius == 28.
+        Draw::Glass(rect, radius, glass) if rect.x == clear.rect.x && rect.y == clear.rect.y && *radius == 28.
+            && glass.tint[0] > 0.9
     )));
     let category = rendered
         .controls
@@ -2765,7 +2766,8 @@ fn category_focus_active_and_clear_button_share_the_pill_style() {
     state.focus = Target::Filter(1);
     let focused = scene(&state);
     assert!(focused.draw.iter().any(|draw| matches!(draw,
-        Draw::RoundedGradient(rect, radius, ..) if rect.x == category.rect.x && rect.y == category.rect.y && *radius == 28.
+        Draw::Glass(rect, radius, glass) if rect.x == category.rect.x && rect.y == category.rect.y && *radius == 28.
+            && glass.tint[0] > 0.9
     )));
 }
 

@@ -5,6 +5,8 @@ uniform vec4 u_edge_fade_x;
 uniform vec3 u_app_top;
 uniform vec3 u_app_bottom;
 uniform bool u_app;
+// Liquid Glass: [body, shine, opacity]; body < 0 is off.
+uniform vec3 u_glass;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
 varying PAINT_PRECISION vec4 v_shape;
@@ -44,6 +46,49 @@ void main() {
     }
     if (v_params.y > 0.0) {
         alpha *= clamp(0.5 + (d + v_params.y) / u_aa, 0.0, 1.0);
+    }
+    if (u_glass.x >= 0.0) {
+        // Outward normal of the rounded rectangle and depth into it, in logical pixels.
+        vec2 qp = max(q, vec2(0.0));
+        vec2 n = (qp.x > 0.0 || qp.y > 0.0) ? normalize(qp + 1e-4)
+            : (q.x > q.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0));
+        n *= sign(v_shape.xy + 1e-4);
+        float inside = max(-d, 0.0);
+        float bezel = max(min(radius * 0.85, min(half_size.x, half_size.y) * 0.8), 6.0);
+        float t = clamp(inside / bezel, 0.0, 1.0);
+        // A convex lens rim: light from beyond the edge bends inwards, steepest at the rim.
+        float bend = (1.0 - t) * (1.0 - t) * min(bezel * 1.1, 34.0);
+        vec2 px = vec2(1.0 / 1920.0, 1.0 / 1080.0);
+        vec2 shift = n * bend * px;
+        vec3 bg = vec3(
+            texture2D(u_texture, v_uv + shift * 1.10).r,
+            texture2D(u_texture, v_uv + shift).g,
+            texture2D(u_texture, v_uv + shift * 0.90).b);
+        // Vibrancy: glass lifts and saturates what it shows.
+        float luma = dot(bg, vec3(0.2126, 0.7152, 0.0722));
+        bg = clamp(mix(vec3(luma), bg, 1.35) * 1.02 + 0.01, 0.0, 1.0);
+        bg = mix(bg, v_color.rgb, v_color.a);
+        // Specular: a hairline rim lit from the upper left, with a softer echo opposite
+        // and a broad inner glow across the bezel.
+        vec2 light = normalize(vec2(-0.55, -0.83));
+        float facing = dot(n, light);
+        float line = 1.0 - smoothstep(0.0, 1.2 + u_aa * 1.5, inside);
+        float glow = (1.0 - t) * (1.0 - t);
+        float lit = max(facing, 0.0);
+        float back = max(-facing, 0.0);
+        lit *= lit;
+        back *= back;
+        float spec = line * (0.07 + 0.95 * lit + 0.55 * back)
+            + glow * (0.13 * lit + 0.06 * back + 0.02);
+        spec *= u_glass.y;
+        // A faint sheen over the top half of the body.
+        float y = v_shape.y / (2.0 * half_size.y) + 0.5;
+        float sheen = 0.05 * (1.0 - smoothstep(0.0, 0.55, y)) * u_glass.y;
+        vec3 body = clamp(bg + vec3(spec + sheen), 0.0, 1.0);
+        float rim_alpha = clamp(spec * 1.1, 0.0, 1.0);
+        vec4 glass = mix(vec4(1.0, 1.0, 1.0, rim_alpha), vec4(body, 1.0), u_glass.x);
+        gl_FragColor = vec4(glass.rgb, glass.a * alpha * u_glass.z * edge_coverage());
+        return;
     }
     vec4 color = texture2D(u_texture, v_uv);
     if (u_app) {
