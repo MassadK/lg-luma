@@ -814,7 +814,16 @@ fn header(
     }
     let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
     if !out.classic {
-        glass_tabs(out, state, &layout, pill);
+        // iOS 27 text segments nearly fill their track: about 6% of its height on each side.
+        let inset = 4.4;
+        let grow = 9.8 - inset;
+        let segment = Rect::new(
+            pill.x - grow,
+            nav.y + inset,
+            pill.w + 2. * grow,
+            nav.h - 2. * inset,
+        );
+        glass_tabs(out, state, &layout, segment);
     } else {
         out.draw.push(Draw::RoundedGradient(
             pill,
@@ -874,15 +883,17 @@ fn header(
     out.control(Target::TvSettings, rect, false);
 }
 
-/// The Liquid Glass tab bar: labels, then the selection, then each label again inside the
-/// selection only. At rest the selection is frosted white with dark labels. While it moves it
-/// lifts into a larger clear lens that bends, magnifies and disperses what lies beneath, and
-/// stretches with its speed, like the iOS 26 tab bar.
-fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
+/// The Liquid Glass tab bar, after iOS 27's text-only segmented tabs (Safari's
+/// "Private | Tabs"): a flat dark-grey track; the selected tab a lighter grey glass capsule
+/// nearly filling it, edged by the darkened rim and lit top and bottom, with white semibold
+/// text; other labels at about half white; no outline or glow. Remote focus brightens the
+/// selected tab instead of adding a ring. While it moves, the selection lifts into a larger
+/// clear lens that bends, magnifies and disperses what lies beneath, then settles back.
+fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, segment: Rect) {
     let language = state.preferences.language;
     let lens = state.nav_lens.clamp(0., 1.);
     let stretch = state.nav_stretch.clamp(0., 0.3);
-    let light = c(0xeeeeee, 0.73);
+    let focused = matches!(state.focus, Target::Nav(_)) && !state.pointer;
     let keys = ["home", "apps", "settings"];
     let label = |index: usize| {
         let rect = layout.items[index];
@@ -893,62 +904,51 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
             language.t(key),
             label(index),
             text(20.8, 550, -0.02),
-            light,
+            c(0xffffff, 0.55),
             true,
         );
     }
-    let (cx, cy) = (pill.x + pill.w / 2., pill.y + pill.h / 2.);
-    let w = (pill.w + 24. * lens) * (1. + stretch);
-    let h = (pill.h + 18. * lens) * (1. - 0.3 * stretch);
+    let (cx, cy) = (segment.x + segment.w / 2., segment.y + segment.h / 2.);
+    let lift = if focused { 3. } else { 0. };
+    let w = (segment.w + lift * 2. + 16. * lens) * (1. + stretch);
+    let h = (segment.h + lift + 10. * lens) * (1. - 0.3 * stretch);
     let selection = Rect::new(cx - w / 2., cy - h / 2., w, h);
     let radius = h / 2.;
     out.shadow(
         selection,
         radius,
-        18. + 12. * lens,
-        4. + 5. * lens,
-        0.08 + 0.14 * lens,
+        14. + 12. * lens,
+        3. + 5. * lens,
+        0.10 + 0.14 * lens,
     );
-    if lens < 0.98 {
-        out.draw.push(Draw::Shadow(
-            selection,
-            radius,
-            26.,
-            c(0xffffff, 0.16 * (1. - lens)),
-        ));
-    }
-    // From frosted white at rest to a nearly clear lens with the bar's own faint grey.
-    let rest = Material::Focus.glass(out.frost);
+    // At rest: lighter grey glass, a step above the track, brighter when the remote is on the
+    // bar. Lifted: nearly clear, keeping the track's own faint grey.
     let bar = Material::Regular.glass(out.frost);
+    let grey = if focused { 0.60 } else { 0.50 };
+    let rest = [grey, grey, grey + 0.03, if focused { 0.58 } else { 0.5 }];
     let mix = |a: f32, b: f32| a + (b - a) * lens;
     out.draw.push(Draw::Glass(
         selection,
         radius,
         Glass {
             tint: [
-                mix(rest.tint[0], bar.tint[0]),
-                mix(rest.tint[1], bar.tint[1]),
-                mix(rest.tint[2], bar.tint[2]),
-                mix(rest.tint[3], bar.tint[3] * 0.55),
+                mix(rest[0], bar.tint[0]),
+                mix(rest[1], bar.tint[1]),
+                mix(rest[2], bar.tint[2]),
+                mix(rest[3], bar.tint[3] * 0.55),
             ],
-            shine: mix(rest.shine, 1.7),
+            body: 1.,
+            shine: mix(if focused { 1.15 } else { 0.85 }, 1.7),
+            opacity: 1.,
             lens,
-            // The highlight swings toward the direction of travel; the rim splits into colour
-            // only while lifted, so a resting selection stays a quiet frosted pill.
-            light: (state.nav_velocity / 2600.).clamp(-0.7, 0.7),
+            // Lit from above at rest, as iOS draws it; the light swings toward the direction
+            // of travel while moving, and the rim splits into colour only while lifted.
+            light: 0.58 + (state.nav_velocity / 2600.).clamp(-0.7, 0.7),
             dispersion: lens * lens,
-            ..rest
         },
     ));
-    // Labels seen through the selection: dark on frost, light and magnified through the lens.
+    // Labels seen through the selection: white semibold, magnified through the lens.
     let magnify = 1. + 0.16 * lens;
-    let dark = c(0x2c2c2c, 1.);
-    let through = c(0xffffff, 0.92);
-    // Switch quickly around the midpoint so labels never sit grey on a half-frosted pill.
-    let flip = ((lens - 0.3) / 0.25).clamp(0., 1.);
-    let flip = flip * flip * (3. - 2. * flip);
-    let color: Color = std::array::from_fn(|i| dark[i] + (through[i] - dark[i]) * flip);
-    // Only a moving selection needs clipping; at rest it frames its own label whole.
     let moving = lens > 0.001 || stretch > 0.;
     if moving {
         // A rectangle clip strays from the capsule's ends by a pixel or two at label height.
@@ -992,7 +992,7 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
                 out.text(
                     language.t(key),
                     Rect::new(mx - mw / 2. + outward * t * spread, my - mh / 2., mw, mh),
-                    text(20.8 * magnify, 550, -0.02),
+                    text(20.8 * magnify, 600, -0.02),
                     tint,
                     true,
                 );
@@ -1001,21 +1001,13 @@ fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
         out.text(
             language.t(key),
             Rect::new(mx - mw / 2., my - mh / 2., mw, mh),
-            text(20.8 * magnify, 550, -0.02),
-            color,
+            text(20.8 * magnify, 600, -0.02),
+            WHITE,
             true,
         );
     }
     if moving {
         out.draw.push(Draw::Clip(None));
-    }
-    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
-        out.border(
-            selection.inset(-5.),
-            radius + 5.,
-            2.,
-            c(0xf0f0f0, 0.95 * (1. - lens)),
-        );
     }
 }
 

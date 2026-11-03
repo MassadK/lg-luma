@@ -85,9 +85,13 @@ void main() {
         float g = dot(across, light) / 1.38;
         float lit = smoothstep(0.0, 1.0, g);
         float back = smoothstep(0.0, 1.0, -g);
-        float line = 1.0 - smoothstep(0.0, 1.5 + u_aa * 1.5, inside);
+        // iOS 27 order from the outside in: a one-pixel darkened edge, then the lit rim
+        // fading over a few pixels, then the body.
+        float dark_edge = 1.0 - smoothstep(0.0, 0.8 + u_aa, inside);
+        float rim_at = (inside - 1.4) / (1.4 + u_aa);
+        float line = exp(-rim_at * rim_at) + 0.25 * exp(-max(inside - 1.4, 0.0) / 2.0);
         float sheen_band = 1.0 - smoothstep(0.0, 7.0, inside);
-        float spec = line * (0.11 + 0.55 * lit + 0.24 * back)
+        float spec = line * (0.05 + 0.34 * lit + 0.28 * back)
             + sheen_band * (0.025 + 0.05 * lit);
         spec *= u_glass.y;
         // Dispersion: a lens bends each wavelength by a different amount, so the white rim
@@ -110,7 +114,7 @@ void main() {
         // A faint sheen over the top half of the body.
         float y = v_shape.y / (2.0 * half_size.y) + 0.5;
         float sheen = 0.05 * (1.0 - smoothstep(0.0, 0.55, y)) * u_glass.y;
-        vec3 body = clamp(bg + vec3(spec + sheen) + prism, 0.0, 1.0);
+        vec3 body = clamp(bg * (1.0 - 0.55 * dark_edge) + vec3(spec + sheen) + prism, 0.0, 1.0);
         float rim_alpha = clamp(spec * 1.1 + dot(prism, vec3(0.33)), 0.0, 1.0);
         vec4 glass = mix(vec4(1.0, 1.0, 1.0, rim_alpha), vec4(body, 1.0), u_glass.x);
         gl_FragColor = vec4(glass.rgb, glass.a * alpha * u_glass.z * edge_coverage());
