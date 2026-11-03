@@ -3271,3 +3271,57 @@ fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
     state.install_response(Response::Finished(Ok(())));
     assert_eq!(state.update_status, Status::Unchecked);
 }
+
+#[test]
+fn appearance_toggles_classic_surfaces_and_frost_slider_steps_in_tens() {
+    use crate::renderer::Draw;
+    use crate::state::{APPEARANCE_SETTING, Subpage};
+    let mut state = ready();
+    state.open(2);
+    state.panel_started = None;
+    let glass = |scene: &view::Scene| {
+        scene
+            .draw
+            .iter()
+            .filter(|draw| matches!(draw, Draw::Glass(..)))
+            .count()
+    };
+    assert!(glass(&scene(&state)) > 0);
+    state.focus = Target::Setting(APPEARANCE_SETTING);
+    assert!(state.activate().is_empty());
+    assert_eq!(state.subpage, Some(Subpage::Appearance));
+    assert_eq!(state.focus, Target::Choice(0));
+    state.panel_started = None;
+    // Liquid Glass shows the frost slider beside the choices; Right reaches it.
+    assert!(controls(&state).iter().any(|c| c.target == Target::Frost));
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Frost);
+    assert_eq!(state.preferences.frost, 50);
+    assert_eq!(
+        state.direction(Direction::Up, &controls(&state)),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.preferences.frost, 60);
+    for _ in 0..10 {
+        state.direction(Direction::Down, &controls(&state));
+    }
+    assert_eq!(state.preferences.frost, 0);
+    assert!(
+        state
+            .direction(Direction::Down, &controls(&state))
+            .is_empty()
+    );
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Choice(0));
+    // Classic restores the solid surfaces and hides the slider.
+    state.focus = Target::Choice(1);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.classic_look);
+    let classic = scene(&state);
+    assert_eq!(glass(&classic), 0);
+    assert!(!classic.controls.iter().any(|c| c.target == Target::Frost));
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Choice(1));
+    state.back();
+    assert_eq!(state.focus, Target::Setting(APPEARANCE_SETTING));
+}
