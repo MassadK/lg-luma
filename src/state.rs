@@ -238,6 +238,10 @@ pub struct State {
     /// Inventory loads that failed in a row while no apps were shown yet.
     pub inventory_failures: u32,
     pub dirty: bool,
+    /// How far the Liquid Glass tab selection is lifted into a moving lens, 0 to 1, and how
+    /// much its speed stretches it. Set by the frame loop each frame.
+    pub nav_lens: f32,
+    pub nav_stretch: f32,
     pub pointer: bool,
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
@@ -282,6 +286,8 @@ impl State {
             update_check_requested: false,
             inventory_failures: 0,
             dirty: true,
+            nav_lens: 0.,
+            nav_stretch: 0.,
             pointer: false,
             pressed: None,
             previous_background: None,

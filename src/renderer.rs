@@ -89,6 +89,9 @@ pub struct Glass {
     pub shine: f32,
     /// Overall opacity, for fades.
     pub opacity: f32,
+    /// 0 for a resting surface, 1 for a lifted lens: stronger refraction, magnification
+    /// and dispersion, as the iOS 26 tab selection shows while it moves.
+    pub lens: f32,
 }
 
 struct Texture {
@@ -206,7 +209,7 @@ enum BatchKind {
         start: usize,
         count: usize,
         backdrop: Option<[[u8; 3]; 2]>,
-        glass: Option<[f32; 3]>,
+        glass: Option<[f32; 4]>,
     },
     Vector {
         path: String,
@@ -662,7 +665,7 @@ impl Renderer {
         count: usize,
         texture: GLuint,
         backdrop: Option<[[u8; 3]; 2]>,
-        glass: Option<[f32; 3]>,
+        glass: Option<[f32; 4]>,
     ) {
         if let Some(batch) = self.batches.last_mut() {
             let same_clip = match (batch.clip, self.clip) {
@@ -1183,7 +1186,7 @@ impl Renderer {
             6,
             texture,
             None,
-            Some([glass.body, glass.shine, glass.opacity]),
+            Some([glass.body, glass.shine, glass.opacity, glass.lens]),
         );
     }
 
@@ -1569,12 +1572,13 @@ impl Renderer {
                             gl::GetUniformLocation(self.program, c"u_app".as_ptr()),
                             i32::from(backdrop.is_some()),
                         );
-                        let [body, shine, opacity] = glass.unwrap_or([-1., 0., 0.]);
-                        gl::Uniform3f(
+                        let [body, shine, opacity, lens] = glass.unwrap_or([-1., 0., 0., 0.]);
+                        gl::Uniform4f(
                             gl::GetUniformLocation(self.program, c"u_glass".as_ptr()),
                             body,
                             shine,
                             opacity,
+                            lens,
                         );
                         if let Some(stops) = backdrop {
                             for (name, rgb) in

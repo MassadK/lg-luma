@@ -538,6 +538,7 @@ impl Material {
             body,
             shine,
             opacity: 1.,
+            lens: 0.,
         }
     }
 }
@@ -810,23 +811,27 @@ fn header(
         out.glass(nav, 48., Material::Regular);
     }
     let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
-    if out.classic {
+    if !out.classic {
+        glass_tabs(out, state, &layout, pill);
+    } else {
         out.draw.push(Draw::RoundedGradient(
             pill,
             32.,
             c(0xfafafa, 1.),
             c(0xe5e5e5, 1.),
         ));
-    } else {
-        out.glass(pill, 32., Material::Focus);
     }
-    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
+    if out.classic && matches!(state.focus, Target::Nav(_)) && !state.pointer {
         // Follow the pill's animated position and width instead of jumping to
         // the destination tab's control rectangle.
         out.border(pill.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
     }
     for (index, key) in ["home", "apps", "settings"].into_iter().enumerate() {
         let rect = layout.items[index];
+        if !out.classic {
+            out.control(Target::Nav(index), rect, false);
+            continue;
+        }
         out.text(
             language.t(key),
             Rect::new(rect.x, 64.3, rect.w, 25.),
@@ -865,6 +870,122 @@ fn header(
         },
     );
     out.control(Target::TvSettings, rect, false);
+}
+
+/// The Liquid Glass tab bar: labels, then the selection, then each label again inside the
+/// selection only. At rest the selection is frosted white with dark labels. While it moves it
+/// lifts into a larger clear lens that bends, magnifies and disperses what lies beneath, and
+/// stretches with its speed, like the iOS 26 tab bar.
+fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, pill: Rect) {
+    let language = state.preferences.language;
+    let lens = state.nav_lens.clamp(0., 1.);
+    let stretch = state.nav_stretch.clamp(0., 0.3);
+    let light = c(0xeeeeee, 0.73);
+    let keys = ["home", "apps", "settings"];
+    let label = |index: usize| {
+        let rect = layout.items[index];
+        Rect::new(rect.x, 64.3, rect.w, 25.)
+    };
+    for (index, key) in keys.into_iter().enumerate() {
+        out.text(
+            language.t(key),
+            label(index),
+            text(20.8, 550, -0.02),
+            light,
+            true,
+        );
+    }
+    let (cx, cy) = (pill.x + pill.w / 2., pill.y + pill.h / 2.);
+    let w = (pill.w + 24. * lens) * (1. + stretch);
+    let h = (pill.h + 18. * lens) * (1. - 0.3 * stretch);
+    let selection = Rect::new(cx - w / 2., cy - h / 2., w, h);
+    let radius = h / 2.;
+    out.shadow(
+        selection,
+        radius,
+        18. + 12. * lens,
+        4. + 5. * lens,
+        0.08 + 0.14 * lens,
+    );
+    if lens < 0.98 {
+        out.draw.push(Draw::Shadow(
+            selection,
+            radius,
+            26.,
+            c(0xffffff, 0.16 * (1. - lens)),
+        ));
+    }
+    // From frosted white at rest to a nearly clear lens with the bar's own faint grey.
+    let rest = Material::Focus.glass(out.frost);
+    let bar = Material::Regular.glass(out.frost);
+    let mix = |a: f32, b: f32| a + (b - a) * lens;
+    out.draw.push(Draw::Glass(
+        selection,
+        radius,
+        Glass {
+            tint: [
+                mix(rest.tint[0], bar.tint[0]),
+                mix(rest.tint[1], bar.tint[1]),
+                mix(rest.tint[2], bar.tint[2]),
+                mix(rest.tint[3], bar.tint[3] * 0.55),
+            ],
+            shine: mix(rest.shine, 1.7),
+            lens,
+            ..rest
+        },
+    ));
+    // Labels seen through the selection: dark on frost, light and magnified through the lens.
+    let magnify = 1. + 0.16 * lens;
+    let dark = c(0x2c2c2c, 1.);
+    let through = c(0xffffff, 0.92);
+    // Switch quickly around the midpoint so labels never sit grey on a half-frosted pill.
+    let flip = ((lens - 0.3) / 0.25).clamp(0., 1.);
+    let flip = flip * flip * (3. - 2. * flip);
+    let color: Color = std::array::from_fn(|i| dark[i] + (through[i] - dark[i]) * flip);
+    // Only a moving selection needs clipping; at rest it frames its own label whole.
+    let moving = lens > 0.001 || stretch > 0.;
+    if moving {
+        // A rectangle clip strays from the capsule's ends by a pixel or two at label height.
+        out.draw.push(Draw::Clip(Some(Rect::new(
+            selection.x + 2.5,
+            selection.y,
+            selection.w - 5.,
+            selection.h,
+        ))));
+    }
+    for (index, key) in keys.into_iter().enumerate() {
+        let rect = label(index);
+        let center = rect.x + rect.w / 2.;
+        let outside = if moving {
+            rect.x > selection.x + selection.w || rect.x + rect.w < selection.x
+        } else {
+            center < selection.x || center > selection.x + selection.w
+        };
+        if outside {
+            continue;
+        }
+        let (lx, ly) = (rect.x + rect.w / 2., rect.y + rect.h / 2.);
+        let (mx, my) = (cx + (lx - cx) * magnify, cy + (ly - cy) * magnify);
+        let (mw, mh) = (rect.w * magnify, rect.h * magnify);
+        out.text(
+            language.t(key),
+            Rect::new(mx - mw / 2., my - mh / 2., mw, mh),
+            text(20.8 * magnify, 550, -0.02),
+            color,
+            true,
+        );
+    }
+    if moving {
+        out.draw.push(Draw::Clip(None));
+    }
+    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
+        out.border(
+            selection.inset(-5.),
+            radius + 5.,
+            2.,
+            c(0xf0f0f0, 0.95 * (1. - lens)),
+        );
+    }
 }
 
 fn tile(

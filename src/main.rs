@@ -66,6 +66,8 @@ struct Options {
     assets: Option<PathBuf>,
     preferences: Option<PathBuf>,
     screenshot: Option<PathBuf>,
+    /// Desktop preview: save every frame here on a fixed 60 Hz clock, to review motion.
+    record: Option<PathBuf>,
     dump: Option<PathBuf>,
     frames: Option<u64>,
     script: VecDeque<String>,
@@ -137,6 +139,7 @@ impl Options {
                 "--assets" => result.assets = Some(value.into()),
                 "--preferences" => result.preferences = Some(value.into()),
                 "--screenshot" => result.screenshot = Some(value.into()),
+                "--record" => result.record = Some(value.into()),
                 "--dump-state" => result.dump = Some(value.into()),
                 "--resolution" => result.resolution = Some(value.parse()?),
                 "--capture-scale" => {
@@ -941,6 +944,8 @@ fn run() -> Result<(), String> {
     let initial_nav = view::navigation(&assets, state.preferences.language);
     let mut pill = initial_nav.items[0].x;
     let mut pill_width = initial_nav.items[0].w;
+    let mut pill_velocity = 0f32;
+    let mut width_velocity = 0f32;
     let mut last_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -1691,19 +1696,50 @@ fn run() -> Result<(), String> {
             }
             text_active = keyboard;
         }
-        let dt = last_frame.elapsed().as_secs_f32().min(0.1);
+        let dt = if options.record.is_some() {
+            // Every frame is drawn and saved, so the recording keeps real-time pacing.
+            state.dirty = true;
+            1. / 60.
+        } else {
+            last_frame.elapsed().as_secs_f32().min(0.1)
+        };
         last_frame = Instant::now();
         let navigation = view::navigation(&assets, state.preferences.language);
         let target = navigation.items[state.page_index()].x;
         let target_width = navigation.items[state.page_index()].w;
-        if state.preferences.reduced_motion
-            || ((pill - target).abs() < 0.2 && (pill_width - target_width).abs() < 0.2)
-        {
+        let settled = (pill - target).abs() < 0.2
+            && (pill_width - target_width).abs() < 0.2
+            && pill_velocity.abs() < 4.
+            && state.nav_lens < 0.005;
+        if state.preferences.reduced_motion || settled {
             pill = target;
             pill_width = target_width;
-        } else {
+            pill_velocity = 0.;
+            width_velocity = 0.;
+            state.nav_lens = 0.;
+            state.nav_stretch = 0.;
+        } else if state.preferences.classic_look {
             pill += (target - pill) * (1. - (-20. * dt).exp());
             pill_width += (target_width - pill_width) * (1. - (-20. * dt).exp());
+            state.dirty = true;
+        } else {
+            // Liquid Glass: a slightly underdamped spring (overshoot, then settle) while the
+            // selection lifts into a clear lens, stretches with its speed and drops back.
+            const STIFFNESS: f32 = 240.;
+            const DAMPING: f32 = 24.;
+            let steps = (dt * 480.).ceil().max(1.);
+            let h = dt / steps;
+            for _ in 0..steps as u32 {
+                pill_velocity += (STIFFNESS * (target - pill) - DAMPING * pill_velocity) * h;
+                pill += pill_velocity * h;
+                width_velocity +=
+                    (STIFFNESS * (target_width - pill_width) - DAMPING * width_velocity) * h;
+                pill_width += width_velocity * h;
+            }
+            let travelling = (target - pill).abs() > 8. || pill_velocity.abs() > 160.;
+            let (goal, rate) = if travelling { (1., 26.) } else { (0., 11.) };
+            state.nav_lens += (goal - state.nav_lens) * (1. - (-rate * dt).exp());
+            state.nav_stretch = (pill_velocity.abs() / 3200.).min(0.22);
             state.dirty = true;
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
@@ -1717,6 +1753,13 @@ fn run() -> Result<(), String> {
             let compose_ms = compose_started.elapsed().as_secs_f64() * 1000.;
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {
+                if let Some(directory) = &options.record {
+                    renderer.capture(
+                        &scene.draw,
+                        &directory.join(format!("frame-{frame:04}.png")),
+                        options.capture_size.unwrap_or(Size::HD),
+                    )?;
+                }
                 if final_frame && let Some(path) = &options.screenshot {
                     captured = Some(renderer.capture(
                         &scene.draw,
@@ -1867,6 +1910,7 @@ fn run() -> Result<(), String> {
             250
         } else if pill != target
             || pill_width != target_width
+            || state.nav_lens > 0.
             || state.animating()
             || options.profile_frames.is_some()
         {

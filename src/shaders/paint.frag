@@ -5,8 +5,8 @@ uniform vec4 u_edge_fade_x;
 uniform vec3 u_app_top;
 uniform vec3 u_app_bottom;
 uniform bool u_app;
-// Liquid Glass: [body, shine, opacity]; body < 0 is off.
-uniform vec3 u_glass;
+// Liquid Glass: [body, shine, opacity, lens]; body < 0 is off.
+uniform vec4 u_glass;
 varying PAINT_PRECISION vec2 v_uv;
 varying PAINT_PRECISION vec4 v_color;
 varying PAINT_PRECISION vec4 v_shape;
@@ -57,13 +57,17 @@ void main() {
         float bezel = max(min(radius * 0.85, min(half_size.x, half_size.y) * 0.8), 6.0);
         float t = clamp(inside / bezel, 0.0, 1.0);
         // A convex lens rim: light from beyond the edge bends inwards, steepest at the rim.
-        float bend = (1.0 - t) * (1.0 - t) * min(bezel * 1.1, 34.0);
+        float lens = u_glass.w;
+        float bend = (1.0 - t) * (1.0 - t) * min(bezel * 1.1, 34.0) * (1.0 + 1.4 * lens);
         vec2 px = vec2(1.0 / 1920.0, 1.0 / 1080.0);
         vec2 shift = n * bend * px;
+        // A lifted lens magnifies what lies beneath its centre.
+        vec2 uv = v_uv - v_shape.xy * px * (1.0 - 1.0 / (1.0 + 0.18 * lens));
+        float spread = 0.10 + 0.28 * lens;
         vec3 bg = vec3(
-            texture2D(u_texture, v_uv + shift * 1.10).r,
-            texture2D(u_texture, v_uv + shift).g,
-            texture2D(u_texture, v_uv + shift * 0.90).b);
+            texture2D(u_texture, uv + shift * (1.0 + spread)).r,
+            texture2D(u_texture, uv + shift).g,
+            texture2D(u_texture, uv + shift * (1.0 - spread)).b);
         // Vibrancy: glass lifts and saturates what it shows.
         float luma = dot(bg, vec3(0.2126, 0.7152, 0.0722));
         bg = clamp(mix(vec3(luma), bg, 1.35) * 1.02 + 0.01, 0.0, 1.0);
