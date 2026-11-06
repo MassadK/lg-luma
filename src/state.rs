@@ -25,6 +25,10 @@ pub const HOME_TILE_WIDTH: f32 = 256.;
 pub const HOME_TILE_PITCH: f32 = 281.6;
 pub const HOME_FADE_LEFT: f32 = 8.;
 pub const HOME_FADE_RIGHT: f32 = 1910.;
+/// Magic Remote edge scrolling on the Home favorites row: how far in from either screen edge
+/// the pointer starts gliding the row, and its speed there and at the very edge (px/s).
+pub const HOME_EDGE_ZONE: f32 = 180.;
+pub const HOME_EDGE_SPEED: [f32; 2] = [220., 1500.];
 pub const BACKGROUND_FADE: f32 = 0.4;
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -80,6 +84,8 @@ pub enum Target {
     InputRename,
     InputNameReset,
     Choice(usize),
+    /// The Liquid Glass frost slider on the Appearance page.
+    Frost,
     CloseDialog,
     Retry,
     DismissNotice,
@@ -144,6 +150,9 @@ pub enum Overlay {
     BackgroundDelete { id: String, restore: Target },
 }
 
+/// General settings row that opens the Liquid Glass / Classic appearance page.
+pub const APPEARANCE_SETTING: usize = 11;
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Subpage {
     AppNames,
@@ -161,6 +170,7 @@ pub enum Subpage {
     Temperature,
     Language,
     TextRendering,
+    Appearance,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -232,6 +242,16 @@ pub struct State {
     /// Inventory loads that failed in a row while no apps were shown yet.
     pub inventory_failures: u32,
     pub dirty: bool,
+    /// How far the Liquid Glass tab selection is lifted into a moving lens, 0 to 1, and how
+    /// much its speed stretches it. Set by the frame loop each frame.
+    pub nav_lens: f32,
+    pub nav_stretch: f32,
+    /// Signed horizontal speed of the tab selection, in logical pixels per second.
+    pub nav_velocity: f32,
+    /// Last Magic Remote pointer position, in logical pixels.
+    pub pointer_at: Option<(f32, f32)>,
+    /// Whether the favorites row glided under the pointer this frame.
+    pub edge_scrolling: bool,
     pub pointer: bool,
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
@@ -276,6 +296,11 @@ impl State {
             update_check_requested: false,
             inventory_failures: 0,
             dirty: true,
+            nav_lens: 0.,
+            nav_stretch: 0.,
+            nav_velocity: 0.,
+            pointer_at: None,
+            edge_scrolling: false,
             pointer: false,
             pressed: None,
             previous_background: None,
@@ -603,6 +628,48 @@ impl State {
         self.pointer = true;
         self.dirty = true;
         favorites
+    }
+
+    /// Holding the pointer near either end of the Home favorites row glides it that way, slowly
+    /// at the zone's inner edge and fastest at the screen edge, until the row runs out.
+    /// Returns whether the row moved.
+    pub fn edge_scroll(&mut self, controls: &[Control], dt: f32) -> bool {
+        let Some((x, y)) = self.pointer_at else {
+            return false;
+        };
+        if !self.pointer
+            || self.page != Page::Home
+            || self.overlay.is_some()
+            || self.moving.is_some()
+            || self.recents_open()
+        {
+            return false;
+        }
+        let (top, bottom) = controls
+            .iter()
+            .filter(|control| matches!(control.target, Target::App(_)))
+            .fold((f32::MAX, f32::MIN), |(top, bottom), control| {
+                (
+                    top.min(control.rect.y),
+                    bottom.max(control.rect.y + control.rect.h),
+                )
+            });
+        if top > bottom || y < top - 24. || y > bottom + 24. {
+            return false;
+        }
+        let depth = if x > 1920. - HOME_EDGE_ZONE {
+            (x - (1920. - HOME_EDGE_ZONE)) / HOME_EDGE_ZONE
+        } else if x < HOME_EDGE_ZONE {
+            -(HOME_EDGE_ZONE - x) / HOME_EDGE_ZONE
+        } else {
+            return false;
+        };
+        let reach = depth.abs().min(1.);
+        let [slow, fast] = HOME_EDGE_SPEED;
+        let speed = slow + (fast - slow) * reach * reach;
+        let before = self.home_scroll;
+        self.scroll_favorites(depth.signum() * speed * dt);
+        self.home_scroll != before
     }
 
     pub fn scroll_favorites(&mut self, delta: f32) {
@@ -1022,6 +1089,7 @@ impl State {
             }
             Some(Subpage::Language) => Target::Setting(4),
             Some(Subpage::TextRendering) => Target::Setting(7),
+            Some(Subpage::Appearance) => Target::Setting(APPEARANCE_SETTING),
             None => Target::Sidebar(self.section),
         };
         self.scroll = 0.;
@@ -1159,13 +1227,31 @@ impl State {
                 }
                 return vec![];
             }
+            if self.focus == Target::Frost {
+                let step = match direction {
+                    Direction::Up => 10,
+                    Direction::Down => -10,
+                    Direction::Left => {
+                        self.focus(Target::Choice(0), controls);
+                        return vec![];
+                    }
+                    Direction::Right => return vec![],
+                };
+                let frost = (i16::from(self.preferences.frost.min(100)) + step).clamp(0, 100) as u8;
+                if frost != self.preferences.frost {
+                    self.preferences.frost = frost;
+                    return vec![Effect::Save];
+                }
+                return vec![];
+            }
             if let Target::Choice(index) = self.focus {
                 let count = match self.subpage {
                     Some(
                         Subpage::ClockFormat
                         | Subpage::TimeFormat
                         | Subpage::Temperature
-                        | Subpage::TextRendering,
+                        | Subpage::TextRendering
+                        | Subpage::Appearance,
                     ) => 2,
                     Some(Subpage::Language) => Language::ALL.len(),
                     Some(Subpage::DateFormat) => crate::model::DateFormat::ALL.len(),
@@ -1188,6 +1274,12 @@ impl State {
                         self.focus(Target::InputRename, controls)
                     }
                     Direction::Down => self.focus(Target::Choice((index + 1) % count), controls),
+                    Direction::Right
+                        if self.subpage == Some(Subpage::Appearance)
+                            && !self.preferences.classic_look =>
+                    {
+                        self.focus(Target::Frost, controls)
+                    }
                     Direction::Right => {}
                 }
                 return vec![];
@@ -2195,6 +2287,15 @@ impl State {
                         return vec![];
                     }
                     5 => return vec![Effect::Quit],
+                    APPEARANCE_SETTING => {
+                        self.subpage = Some(Subpage::Appearance);
+                        self.focus = Target::Choice(usize::from(self.preferences.classic_look));
+                        self.scroll = 0.;
+                        if !self.preferences.reduced_motion {
+                            self.panel_started = Some(Instant::now());
+                        }
+                        return vec![];
+                    }
                     7 => {
                         self.subpage = Some(Subpage::TextRendering);
                         self.focus = Target::Choice(self.preferences.text_rendering.index());
@@ -2298,6 +2399,11 @@ impl State {
                         self.preferences.language =
                             Language::ALL[index.min(Language::ALL.len() - 1)];
                         self.weather.cancel_search();
+                    }
+                    Some(Subpage::Appearance) => {
+                        // Stay on the page so the frost slider appears or leaves in place.
+                        self.preferences.classic_look = index == 1;
+                        return vec![Effect::Save];
                     }
                     Some(Subpage::TextRendering) => {
                         let mode = TextRendering::ALL[index.min(TextRendering::ALL.len() - 1)];

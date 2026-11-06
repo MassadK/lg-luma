@@ -251,6 +251,10 @@ pub struct Preferences {
     pub wallpaper_gradient: bool,
     /// Unix seconds of the last automatic or chosen wallpaper change, for the timed modes.
     pub wallpaper_changed: u64,
+    /// The original solid surfaces instead of Liquid Glass.
+    pub classic_look: bool,
+    /// How frosted Liquid Glass is, 0–100.
+    pub frost: u8,
 }
 
 impl Default for Preferences {
@@ -281,6 +285,8 @@ impl Default for Preferences {
             wallpaper_cycle: false,
             wallpaper_gradient: true,
             wallpaper_changed: 0,
+            classic_look: false,
+            frost: 50,
         }
     }
 }

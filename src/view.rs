@@ -2,11 +2,11 @@
 use crate::{
     i18n::Language,
     model::{App, BACKGROUNDS, CATEGORIES, Input, InputMode},
-    renderer::{Color, Draw, TextStyle, WHITE},
+    renderer::{Color, Draw, Glass, TextStyle, WHITE},
     state::{
-        APPS_COLUMNS, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT, HOME_STRIP_LEFT, HOME_STRIP_RIGHT,
-        HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page, Rect, SYSTEM_SECTION, State,
-        Subpage, Target, TextField, WIDGETS_SECTION,
+        APPEARANCE_SETTING, APPS_COLUMNS, Control, HOME_FADE_LEFT, HOME_FADE_RIGHT,
+        HOME_STRIP_LEFT, HOME_STRIP_RIGHT, HOME_TILE_PITCH, HOME_TILE_WIDTH, KEYS, Overlay, Page,
+        Rect, SYSTEM_SECTION, State, Subpage, Target, TextField, WIDGETS_SECTION,
     },
     weather::{self, Unit},
 };
@@ -164,6 +164,10 @@ pub struct Scene {
     pub draw: Vec<Draw>,
     pub controls: Vec<Control>,
     pub modal: Option<Rect>,
+    /// The original solid surfaces instead of Liquid Glass.
+    pub classic: bool,
+    /// How frosted regular glass is, 0 (clear) to 1 (milky).
+    pub frost: f32,
 }
 impl Scene {
     fn new() -> Self {
@@ -171,7 +175,18 @@ impl Scene {
             draw: Vec::new(),
             controls: Vec::new(),
             modal: None,
+            classic: false,
+            frost: DEFAULT_FROST,
         }
+    }
+    fn glass(&mut self, rect: Rect, radius: f32, material: Material) {
+        if material == Material::Focus {
+            // Frosted white surfaces glow softly into the glass around them.
+            self.draw
+                .push(Draw::Shadow(rect, radius, 26., c(0xffffff, 0.16)));
+        }
+        self.draw
+            .push(Draw::Glass(rect, radius, material.glass(self.frost)));
     }
     fn shape(&mut self, rect: Rect, radius: f32, fill: Color) {
         self.draw.push(Draw::Shape(rect, radius, 0., fill));
@@ -222,6 +237,21 @@ impl Scene {
         ));
     }
     fn pill(&mut self, rect: Rect, focused: bool, selected: bool) {
+        if !self.classic {
+            self.shadow(rect, rect.h / 2., 18., 4., 0.08);
+            self.glass(
+                rect,
+                rect.h / 2.,
+                if focused {
+                    Material::Focus
+                } else if selected {
+                    Material::Selected
+                } else {
+                    Material::Regular
+                },
+            );
+            return;
+        }
         self.shadow(rect, rect.h / 2., 18., 4., 0.06);
         if focused {
             self.draw.push(Draw::RoundedGradient(
@@ -269,6 +299,12 @@ impl Scene {
                         *contain,
                         [brightness, brightness, brightness, alpha],
                     );
+                }
+                Draw::Glass(_, _, glass) => {
+                    for channel in &mut glass.tint[..3] {
+                        *channel *= brightness;
+                    }
+                    glass.opacity *= alpha;
                 }
                 Draw::Clip(_) | Draw::EdgeFade(_) | Draw::EdgeFadeX(_) => {}
             }
@@ -464,6 +500,51 @@ fn companion(
     out.control(Target::CloseDialog, close, false);
 }
 
+pub const DEFAULT_FROST: f32 = 0.5;
+
+/// Liquid Glass materials, after iOS 26 Control Center: neutral grey glass whose
+/// frost sets how milky it is, a lighter selected state, and a frosted white for focus.
+#[derive(Clone, Copy, PartialEq)]
+enum Material {
+    Regular,
+    Selected,
+    Focus,
+    Panel,
+    /// The lit rim alone, over opaque artwork such as app cards, at this strength.
+    Rim(f32),
+}
+impl Material {
+    fn glass(self, frost: f32) -> Glass {
+        let frost = frost.clamp(0., 1.);
+        let mix = |a: f32, b: f32| a + (b - a) * frost;
+        let (tint, body, shine) = match self {
+            Self::Regular => {
+                let grey = mix(0.16, 0.42);
+                ([grey, grey, grey + 0.02, mix(0.16, 0.62)], 1., 1.)
+            }
+            Self::Selected => {
+                let grey = mix(0.50, 0.70);
+                ([grey, grey, grey + 0.03, mix(0.30, 0.55)], 1., 1.2)
+            }
+            Self::Focus => ([0.965, 0.97, 0.98, 0.9], 1., 1.3),
+            Self::Panel => {
+                let grey = mix(0.12, 0.24);
+                ([grey, grey, grey + 0.02, mix(0.55, 0.78)], 1., 1.)
+            }
+            Self::Rim(shine) => ([0.; 4], 0., shine),
+        };
+        Glass {
+            tint,
+            body,
+            shine,
+            opacity: 1.,
+            lens: 0.,
+            light: 0.,
+            dispersion: 0.,
+        }
+    }
+}
+
 fn c(rgb: u32, alpha: f32) -> Color {
     [
         ((rgb >> 16) & 255) as f32 / 255.,
@@ -509,6 +590,8 @@ pub fn scene_with_pill(
     now: OffsetDateTime,
 ) -> Scene {
     let mut out = Scene::new();
+    out.classic = state.preferences.classic_look;
+    out.frost = f32::from(state.preferences.frost.min(100)) / 100.;
     if let Some((previous, start)) = &state.previous_background {
         out.image(
             assets.background(state, previous),
@@ -721,23 +804,58 @@ fn header(
     );
     let layout = navigation(assets, language);
     let nav = layout.surface;
-    out.shadow(nav, 48., 18., 4., 0.06);
-    out.shape(nav, 48., c(0x171c20, 0.72));
-    out.border(nav, 48., 1., c(0xffffff, 0.07));
+    if out.classic {
+        out.shadow(nav, 48., 18., 4., 0.06);
+        out.shape(nav, 48., c(0x171c20, 0.72));
+        out.border(nav, 48., 1., c(0xffffff, 0.07));
+    } else {
+        out.shadow(nav, 48., 24., 6., 0.10);
+        // iOS 27 segment tracks are flat glass with only the darkened edge: no light rim, so
+        // the band of track around the selected segment reads clearly.
+        let track = Material::Regular.glass(out.frost);
+        out.draw.push(Draw::Glass(
+            nav,
+            48.,
+            Glass {
+                shine: 0.12,
+                ..track
+            },
+        ));
+    }
     let pill = Rect::new(pill_x, 52.3, pill_width, 49.);
-    out.draw.push(Draw::RoundedGradient(
-        pill,
-        32.,
-        c(0xfafafa, 1.),
-        c(0xe5e5e5, 1.),
-    ));
-    if matches!(state.focus, Target::Nav(_)) && !state.pointer {
+    if !out.classic {
+        // Measured from iOS 27 Safari's segmented tabs: the selected segment sits 6.1% of the
+        // track's height inside it, edge to edge, the same above, below and at the ends, and
+        // is concentric with it (both are capsules).
+        let inset = nav.h * 0.061;
+        // Tab items sit 9.8 inside the track; widen the segment so its ends keep that inset.
+        let grow = 9.8 - inset;
+        let segment = Rect::new(
+            pill.x - grow,
+            nav.y + inset,
+            pill.w + 2. * grow,
+            nav.h - 2. * inset,
+        );
+        glass_tabs(out, state, &layout, segment);
+    } else {
+        out.draw.push(Draw::RoundedGradient(
+            pill,
+            32.,
+            c(0xfafafa, 1.),
+            c(0xe5e5e5, 1.),
+        ));
+    }
+    if out.classic && matches!(state.focus, Target::Nav(_)) && !state.pointer {
         // Follow the pill's animated position and width instead of jumping to
         // the destination tab's control rectangle.
         out.border(pill.inset(-5.), 37., 2., c(0xf0f0f0, 0.95));
     }
     for (index, key) in ["home", "apps", "settings"].into_iter().enumerate() {
         let rect = layout.items[index];
+        if !out.classic {
+            out.control(Target::Nav(index), rect, false);
+            continue;
+        }
         out.text(
             language.t(key),
             Rect::new(rect.x, 64.3, rect.w, 25.),
@@ -776,6 +894,134 @@ fn header(
         },
     );
     out.control(Target::TvSettings, rect, false);
+}
+
+/// The Liquid Glass tab bar, after iOS 27's text-only segmented tabs (Safari's
+/// "Private | Tabs"): a flat dark-grey track; the selected tab a lighter grey glass capsule
+/// nearly filling it, edged by the darkened rim and lit top and bottom, with white semibold
+/// text; other labels at about half white; no outline or glow. Remote focus brightens the
+/// selected tab instead of adding a ring. While it moves, the selection lifts into a larger
+/// clear lens that bends, magnifies and disperses what lies beneath, then settles back.
+fn glass_tabs(out: &mut Scene, state: &State, layout: &Navigation, segment: Rect) {
+    let language = state.preferences.language;
+    let lens = state.nav_lens.clamp(0., 1.);
+    let stretch = state.nav_stretch.clamp(0., 0.3);
+    let focused = matches!(state.focus, Target::Nav(_)) && !state.pointer;
+    let keys = ["home", "apps", "settings"];
+    let label = |index: usize| {
+        let rect = layout.items[index];
+        Rect::new(rect.x, 64.3, rect.w, 25.)
+    };
+    for (index, key) in keys.into_iter().enumerate() {
+        out.text(
+            language.t(key),
+            label(index),
+            text(20.8, 550, -0.02),
+            c(0xffffff, 0.55),
+            true,
+        );
+    }
+    let (cx, cy) = (segment.x + segment.w / 2., segment.y + segment.h / 2.);
+    // Remote focus brightens the segment but never grows it, so its gap to the track holds.
+    let w = (segment.w + 16. * lens) * (1. + stretch);
+    let h = (segment.h + 10. * lens) * (1. - 0.3 * stretch);
+    let selection = Rect::new(cx - w / 2., cy - h / 2., w, h);
+    let radius = h / 2.;
+    out.shadow(
+        selection,
+        radius,
+        14. + 12. * lens,
+        3. + 5. * lens,
+        0.10 + 0.14 * lens,
+    );
+    // At rest: lighter grey glass, a step above the track, brighter when the remote is on the
+    // bar. Lifted: nearly clear, keeping the track's own faint grey.
+    let bar = Material::Regular.glass(out.frost);
+    let grey = if focused { 0.60 } else { 0.50 };
+    let rest = [grey, grey, grey + 0.03, if focused { 0.58 } else { 0.5 }];
+    let mix = |a: f32, b: f32| a + (b - a) * lens;
+    out.draw.push(Draw::Glass(
+        selection,
+        radius,
+        Glass {
+            tint: [
+                mix(rest[0], bar.tint[0]),
+                mix(rest[1], bar.tint[1]),
+                mix(rest[2], bar.tint[2]),
+                mix(rest[3], bar.tint[3] * 0.55),
+            ],
+            body: 1.,
+            shine: mix(if focused { 1.15 } else { 0.85 }, 1.7),
+            opacity: 1.,
+            lens,
+            // Lit from above at rest, as iOS draws it; the light swings toward the direction
+            // of travel while moving, and the rim splits into colour only while lifted.
+            light: 0.58 + (state.nav_velocity / 2600.).clamp(-0.7, 0.7),
+            dispersion: lens * lens,
+        },
+    ));
+    // Labels seen through the selection: white semibold, magnified through the lens.
+    let magnify = 1. + 0.16 * lens;
+    let moving = lens > 0.001 || stretch > 0.;
+    if moving {
+        // A rectangle clip strays from the capsule's ends by a pixel or two at label height.
+        out.draw.push(Draw::Clip(Some(Rect::new(
+            selection.x + 2.5,
+            selection.y,
+            selection.w - 5.,
+            selection.h,
+        ))));
+    }
+    for (index, key) in keys.into_iter().enumerate() {
+        let rect = label(index);
+        let center = rect.x + rect.w / 2.;
+        let outside = if moving {
+            rect.x > selection.x + selection.w || rect.x + rect.w < selection.x
+        } else {
+            center < selection.x || center > selection.x + selection.w
+        };
+        if outside {
+            continue;
+        }
+        let (lx, ly) = (rect.x + rect.w / 2., rect.y + rect.h / 2.);
+        let (mx, my) = (cx + (lx - cx) * magnify, cy + (ly - cy) * magnify);
+        let (mw, mh) = (rect.w * magnify, rect.h * magnify);
+        // Labels nearer the lens rim split into faint spectral copies, red outward and violet
+        // inward, the way bright edges seen through the rim of real glass do.
+        let rim = ((mx - cx).abs() / (w / 2.)).clamp(0., 1.);
+        let fringe = rim.powf(1.4) * lens * lens;
+        if moving && fringe > 0.02 {
+            let outward = (mx - cx).signum();
+            let spread = 4.5 * fringe;
+            for (t, hue) in [
+                (1.0, c(0xff3b30, 1.)),
+                (0.5, c(0xffcc00, 1.)),
+                (0.0, c(0x34c759, 1.)),
+                (-0.5, c(0x32ade6, 1.)),
+                (-1.0, c(0x8e5cff, 1.)),
+            ] {
+                let mut tint = hue;
+                tint[3] = 0.26 * fringe;
+                out.text(
+                    language.t(key),
+                    Rect::new(mx - mw / 2. + outward * t * spread, my - mh / 2., mw, mh),
+                    text(20.8 * magnify, 600, -0.02),
+                    tint,
+                    true,
+                );
+            }
+        }
+        out.text(
+            language.t(key),
+            Rect::new(mx - mw / 2., my - mh / 2., mw, mh),
+            text(20.8 * magnify, 600, -0.02),
+            WHITE,
+            true,
+        );
+    }
+    if moving {
+        out.draw.push(Draw::Clip(None));
+    }
 }
 
 fn tile(
@@ -825,6 +1071,9 @@ fn tile(
         if focused { 0.4 } else { 0.165 },
     );
     let favorite_color = app_face(out, assets, app, rect, state.preferences.language, 19.2);
+    if !out.classic {
+        out.glass(rect, 19.2, Material::Rim(if focused { 1.1 } else { 0.6 }));
+    }
     if pinned {
         favorite_badge(out, assets, rect, favorite_color);
     }
@@ -1274,26 +1523,38 @@ fn home(out: &mut Scene, state: &State, assets: &Assets, now: OffsetDateTime) {
             if focused { 14. } else { 1. },
             if focused { 0.4 } else { 0.01 },
         );
-        out.draw.push(Draw::RoundedGradient(
-            rect,
-            18.4,
-            if focused {
-                c(0x30363c, 0.70)
-            } else {
-                c(0x20252b, 0.60)
-            },
-            if focused {
-                c(0x242a30, 0.65)
-            } else {
-                c(0x171c22, 0.55)
-            },
-        ));
-        out.border(
-            rect,
-            18.4,
-            1.,
-            c(0xffffff, if focused { 0.24 } else { 0.063 }),
-        );
+        if out.classic {
+            out.draw.push(Draw::RoundedGradient(
+                rect,
+                18.4,
+                if focused {
+                    c(0x30363c, 0.70)
+                } else {
+                    c(0x20252b, 0.60)
+                },
+                if focused {
+                    c(0x242a30, 0.65)
+                } else {
+                    c(0x171c22, 0.55)
+                },
+            ));
+            out.border(
+                rect,
+                18.4,
+                1.,
+                c(0xffffff, if focused { 0.24 } else { 0.063 }),
+            );
+        } else {
+            out.glass(
+                rect,
+                18.4,
+                if focused {
+                    Material::Selected
+                } else {
+                    Material::Regular
+                },
+            );
+        }
         let art = Rect::new(rect.x + 21., rect.y + 24., 56., 56.);
         out.draw.push(Draw::RoundedGradient(
             art,
@@ -1547,21 +1808,33 @@ fn library_toolbar(out: &mut Scene, state: &State, assets: &Assets) {
     }
     let search = Rect::new(1532., 164.8, 304., 56.);
     let focused = matches!(state.focus, Target::Search | Target::ClearSearch);
-    out.shape(
-        search,
-        48.,
-        if focused {
-            c(0x303438, 1.)
-        } else {
-            c(0x171c20, 0.72)
-        },
-    );
-    out.border(
-        search,
-        48.,
-        1.,
-        c(0xffffff, if focused { 0.70 } else { 0.07 }),
-    );
+    if out.classic {
+        out.shape(
+            search,
+            48.,
+            if focused {
+                c(0x303438, 1.)
+            } else {
+                c(0x171c20, 0.72)
+            },
+        );
+        out.border(
+            search,
+            48.,
+            1.,
+            c(0xffffff, if focused { 0.70 } else { 0.07 }),
+        );
+    } else {
+        out.glass(
+            search,
+            48.,
+            if focused {
+                Material::Selected
+            } else {
+                Material::Regular
+            },
+        );
+    }
     if focused {
         out.border(search.inset(-3.), 51., 3., c(0xffffff, 0.063));
     }
@@ -1732,12 +2005,16 @@ fn row(out: &mut Scene, state: &State, assets: &Assets, row: Row<'_>) {
     let bright = focused;
     let radius = if row.description.is_some() { 20. } else { 48. };
     if bright {
-        out.draw.push(Draw::RoundedGradient(
-            row.rect,
-            radius,
-            c(0xfafafa, 1.),
-            c(0xe5e5e5, 1.),
-        ));
+        if out.classic {
+            out.draw.push(Draw::RoundedGradient(
+                row.rect,
+                radius,
+                c(0xfafafa, 1.),
+                c(0xe5e5e5, 1.),
+            ));
+        } else {
+            out.glass(row.rect, radius, Material::Focus);
+        }
     } else {
         settings_surface(out, row.rect, radius);
     }
@@ -1941,8 +2218,12 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     let mut y = 164.8 - state.scroll;
     if let Some(place) = &state.preferences.weather_location {
         let rect = Rect::new(640., y, 1120., 76.2);
-        out.shape(rect, 20., c(0x171c20, 0.72));
-        out.border(rect, 20., 1., c(0xffffff, 0.04));
+        if out.classic {
+            out.shape(rect, 20., c(0x171c20, 0.72));
+            out.border(rect, 20., 1., c(0xffffff, 0.04));
+        } else {
+            out.glass(rect, 20., Material::Regular);
+        }
         out.icon(
             assets,
             "location",
@@ -2012,8 +2293,12 @@ fn location_settings(out: &mut Scene, state: &State, assets: &Assets) {
     );
     out.control(Target::WeatherQuery, query, true);
     let search = Rect::new(1696., y, 64., 64.);
-    out.shape(search, 32., c(0x171c20, 0.72));
-    out.border(search, 32., 1., c(0xffffff, 0.07));
+    if out.classic {
+        out.shape(search, 32., c(0x171c20, 0.72));
+        out.border(search, 32., 1., c(0xffffff, 0.07));
+    } else {
+        out.glass(search, 32., Material::Regular);
+    }
     out.icon(
         assets,
         if state.weather.searching {
@@ -2150,6 +2435,7 @@ fn settings_sidebar(out: &mut Scene, state: &State, assets: &Assets) {
                 Some(Subpage::Clock) => language.t("clock"),
                 Some(Subpage::Language) => language.t("language"),
                 Some(Subpage::TextRendering) => language.t("textRendering"),
+                Some(Subpage::Appearance) => language.t("appearance"),
                 _ => "",
             };
             let mut path = vec![label];
@@ -2317,6 +2603,18 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 .into_iter()
                 .map(|option| (option.name(), None, option == language))
                 .collect(),
+            Subpage::Appearance => vec![
+                (
+                    language.t("liquidGlass"),
+                    Some(language.t("liquidGlassDescription")),
+                    !state.preferences.classic_look,
+                ),
+                (
+                    language.t("classicLook"),
+                    Some(language.t("classicLookDescription")),
+                    state.preferences.classic_look,
+                ),
+            ],
             Subpage::TextRendering => crate::text_rendering::TextRendering::ALL
                 .into_iter()
                 .map(|mode| {
@@ -2328,6 +2626,9 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 })
                 .collect(),
         };
+        // The frost slider sits beside the style choices while Liquid Glass is on.
+        let slider = *subpage == Subpage::Appearance && !state.preferences.classic_look;
+        let width = if slider { 840. } else { 1120. };
         for (index, (title, description, selected)) in options.into_iter().enumerate() {
             let h = if description.is_some() { 90.7 } else { 72. };
             row(
@@ -2336,7 +2637,7 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                 assets,
                 Row {
                     target: Target::Choice(index),
-                    rect: Rect::new(640., 164.8 + index as f32 * (h + 12.) - s, 1120., h),
+                    rect: Rect::new(640., 164.8 + index as f32 * (h + 12.) - s, width, h),
                     title,
                     icon: None,
                     value: None,
@@ -2348,6 +2649,9 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
         }
         if let Subpage::Input(id) = subpage {
             input_name_rows(out, state, assets, id, 164.8 + 3. * 102.7 + 16. - s);
+        }
+        if slider {
+            frost_slider(out, state, assets, Rect::new(1560., 164.8 - s, 200., 380.));
         }
         if let Some(opened) = state.panel_started {
             out.fade(start, (opened.elapsed().as_secs_f32() / 0.15).min(1.), 1.);
@@ -2370,6 +2674,17 @@ fn settings_content(out: &mut Scene, state: &State, assets: &Assets) {
                         language.t("stateOff")
                     }),
                     false,
+                ),
+                (
+                    APPEARANCE_SETTING,
+                    "appearance",
+                    "sparkles",
+                    Some(if state.preferences.classic_look {
+                        language.t("classicLook")
+                    } else {
+                        language.t("liquidGlass")
+                    }),
+                    true,
                 ),
             ]
             .into_iter()
@@ -2943,9 +3258,68 @@ fn input_name_rows(out: &mut Scene, state: &State, assets: &Assets, id: &str, y:
     }
 }
 
+/// A tall Control Center capsule: glass above, frosted white fill below a flat level line,
+/// the value's icon at the foot. Up and Down move the level in steps of ten.
+fn frost_slider(out: &mut Scene, state: &State, assets: &Assets, rect: Rect) {
+    let language = state.preferences.language;
+    let value = f32::from(state.preferences.frost.min(100)) / 100.;
+    let focused = state.focus == Target::Frost;
+    let radius = rect.w / 2.;
+    if focused {
+        out.draw
+            .push(Draw::Shadow(rect, radius, 34., c(0xffffff, 0.20)));
+    }
+    out.shadow(rect, radius, 30., 10., 0.18);
+    out.glass(rect, radius, Material::Regular);
+    // The fill never quite empties, so the capsule's foot and its icon stay frosted.
+    let level = 0.14 + 0.86 * value;
+    let fill_top = rect.y + rect.h * (1. - level);
+    out.draw.push(Draw::Clip(Some(Rect::new(
+        rect.x - 2.,
+        fill_top,
+        rect.w + 4.,
+        rect.y + rect.h - fill_top + 2.,
+    ))));
+    out.draw.push(Draw::Glass(
+        rect,
+        radius,
+        Glass {
+            tint: [0.975, 0.98, 0.99, 0.94],
+            shine: 0.9,
+            ..Material::Focus.glass(out.frost)
+        },
+    ));
+    out.draw.push(Draw::Clip(None));
+    out.icon(
+        assets,
+        "sparkles",
+        Rect::new(rect.x + rect.w / 2. - 22., rect.y + rect.h - 76., 44., 44.),
+        c(0x5ab4f0, 1.),
+    );
+    if focused {
+        out.border(rect.inset(-6.), radius + 6., 3., c(0xf0f0f0, 0.95));
+    }
+    out.text(
+        format!(
+            "{} · {}%",
+            language.t("frost"),
+            state.preferences.frost.min(100)
+        ),
+        Rect::new(rect.x - 60., rect.y + rect.h + 26., rect.w + 120., 26.),
+        text(20.8, if focused { 600 } else { 550 }, -0.02),
+        if focused { WHITE } else { c(0xeeeeee, 0.73) },
+        true,
+    );
+    out.control(Target::Frost, rect, true);
+}
+
 fn settings_surface(out: &mut Scene, rect: Rect, radius: f32) {
-    out.shape(rect, radius, c(0x171c20, 0.72));
-    out.border(rect, radius, 1., c(0xffffff, 0.07));
+    if out.classic {
+        out.shape(rect, radius, c(0x171c20, 0.72));
+        out.border(rect, radius, 1., c(0xffffff, 0.07));
+    } else {
+        out.glass(rect, radius, Material::Regular);
+    }
 }
 
 fn shortcut_settings(out: &mut Scene, state: &State, assets: &Assets) {
@@ -3208,13 +3582,17 @@ fn options(out: &mut Scene, state: &State, assets: &Assets, id: &str, anchor: Op
     let panel_start = out.draw.len();
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 120., 25., 0.47);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        27.2,
-        c(0x34383b, 0.96),
-        c(0x24282d, 0.988),
-    ));
-    out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    if out.classic {
+        out.draw.push(Draw::RoundedGradient(
+            panel,
+            27.2,
+            c(0x34383b, 0.96),
+            c(0x24282d, 0.988),
+        ));
+        out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    } else {
+        out.glass(panel, 27.2, Material::Panel);
+    }
     let hidden = state.preferences.hidden.iter().any(|item| item == id);
     let actions = if shortcut {
         vec![
@@ -3368,13 +3746,17 @@ fn delete_confirmation(out: &mut Scene, state: &State, assets: &Assets, id: &str
     let panel = Rect::new(640., (1080. - height) / 2., 640., height);
     out.modal = Some(panel);
     out.shadow(panel, 28., 100., 24., 0.47);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        28.,
-        c(0x34383b, 0.98),
-        c(0x24282d, 0.99),
-    ));
-    out.border(panel, 28., 1., c(0xffffff, 0.12));
+    if out.classic {
+        out.draw.push(Draw::RoundedGradient(
+            panel,
+            28.,
+            c(0x34383b, 0.98),
+            c(0x24282d, 0.99),
+        ));
+        out.border(panel, 28., 1., c(0xffffff, 0.12));
+    } else {
+        out.glass(panel, 28., Material::Panel);
+    }
     out.text(
         body,
         Rect::new(panel.x + 36., panel.y + 36., 568., body_height),
@@ -3444,13 +3826,17 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     let panel = Rect::new(350., 290., 1220., 530.);
     out.modal = Some(panel);
     out.shadow(panel, 27.2, 90., 20., 0.45);
-    out.draw.push(Draw::RoundedGradient(
-        panel,
-        27.2,
-        c(0x34383b, 0.98),
-        c(0x24282d, 1.),
-    ));
-    out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    if out.classic {
+        out.draw.push(Draw::RoundedGradient(
+            panel,
+            27.2,
+            c(0x34383b, 0.98),
+            c(0x24282d, 1.),
+        ));
+        out.border(panel, 27.2, 1., c(0xffffff, 0.12));
+    } else {
+        out.glass(panel, 27.2, Material::Panel);
+    }
     out.text(
         match state.keyboard_field {
             TextField::Location => language.t("cityPostcode"),
@@ -3469,7 +3855,11 @@ fn keyboard(out: &mut Scene, state: &State, assets: &Assets) {
     if state.focus == Target::CloseDialog {
         out.border(close, 16.8, 2., WHITE);
     }
-    out.shape(Rect::new(389., 390., 1142., 56.), 28., c(0x171c20, 0.72));
+    if out.classic {
+        out.shape(Rect::new(389., 390., 1142., 56.), 28., c(0x171c20, 0.72));
+    } else {
+        out.glass(Rect::new(389., 390., 1142., 56.), 28., Material::Regular);
+    }
     out.icon(
         assets,
         "search",
@@ -3525,8 +3915,12 @@ fn toast(out: &mut Scene, state: &State, assets: &Assets, notice: &str) {
     let height = 20. + text_height;
     let rect = Rect::new(960. - width / 2., 1080. - 51.2 - height, width, height);
     out.shadow(rect, 16., 18., 4., 0.06);
-    out.shape(rect, 16., c(0x171c20, 0.72));
-    out.border(rect, 16., 1., c(0xffffff, 0.07));
+    if out.classic {
+        out.shape(rect, 16., c(0x171c20, 0.72));
+        out.border(rect, 16., 1., c(0xffffff, 0.07));
+    } else {
+        out.glass(rect, 16., Material::Regular);
+    }
     out.text(
         notice,
         Rect::new(rect.x + 20., rect.y + 10., width - 40., text_height),

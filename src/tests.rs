@@ -737,8 +737,8 @@ fn input_name_actions_only_highlight_the_focused_row_and_keep_the_saved_mode() {
             .draw
             .iter()
             .filter_map(|draw| match draw {
-                crate::renderer::Draw::RoundedGradient(rect, ..)
-                    if rect.x == 640. && rect.w == 1120. =>
+                crate::renderer::Draw::Glass(rect, _, glass)
+                    if rect.x == 640. && rect.w == 1120. && glass.tint[0] > 0.9 =>
                 {
                     Some(rect.y)
                 }
@@ -779,8 +779,8 @@ fn clock_choices_only_highlight_focus_while_preserving_saved_checkmarks() {
             .draw
             .iter()
             .filter_map(|draw| match draw {
-                crate::renderer::Draw::RoundedGradient(rect, ..)
-                    if rect.x == 640. && rect.w == 1120. =>
+                crate::renderer::Draw::Glass(rect, _, glass)
+                    if rect.x == 640. && rect.w == 1120. && glass.tint[0] > 0.9 =>
                 {
                     Some(rect.y)
                 }
@@ -888,8 +888,8 @@ fn system_version_is_inside_the_update_status_card_without_a_separate_row() {
     let system = scene(&state);
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
-        crate::renderer::Draw::Shape(rect, _, _, color)
-            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 220. && color[3] == 0.72
+        crate::renderer::Draw::Glass(rect, _, glass)
+            if rect.x == 640. && rect.y == 164.8 && rect.w == 1120. && rect.h == 220. && glass.body == 1.
     )));
     assert!(system.draw.iter().any(|draw| matches!(
         draw,
@@ -1711,8 +1711,8 @@ fn settings_order_language_sort_and_shortcut_empty_card() {
     state.subpage = Some(Subpage::Shortcuts);
     let empty = scene(&state);
     assert!(empty.draw.iter().any(|draw| matches!(draw,
-        Draw::Shape(rect, radius, stroke, color) if rect.x == 640. && rect.y == 248.8 && rect.h == 220.
-            && *radius == 20. && *stroke == 0. && color[3] == 0.72
+        Draw::Glass(rect, radius, glass) if rect.x == 640. && rect.y == 248.8 && rect.h == 220.
+            && *radius == 20. && glass.body == 1.
     )));
     assert!(empty.draw.iter().any(|draw| matches!(draw,
         Draw::Text(label, _, style, ..) if label == state.preferences.language.t("noTiles") && style.size == 24.
@@ -2282,8 +2282,8 @@ fn shortcut_settings_offer_qr_editing_and_a_test_remove_popup() {
     let page = scene(&state);
     assert!(page.draw.iter().any(|draw| matches!(draw, crate::renderer::Draw::Text(label, _, _, color, _) if label == "Lamp" && color[3] == 0.73)));
     assert!(page.draw.iter().any(|draw| matches!(draw,
-        crate::renderer::Draw::Shape(rect, radius, _, color)
-            if rect.x == 640. && rect.h == 90.7 && *radius == 20. && color[3] == 0.72
+        crate::renderer::Draw::Glass(rect, radius, glass)
+            if rect.x == 640. && rect.h == 90.7 && *radius == 20. && glass.body == 1.
     )));
     assert!(
         !page
@@ -2725,8 +2725,8 @@ fn app_categories_and_search_use_matching_pills_and_larger_heavier_labels() {
         assert_eq!(control.rect.h, 56.);
         assert_eq!(control.rect.y, 164.8);
         assert!(rendered.draw.iter().any(|draw| matches!(draw,
-            Draw::Shape(rect, radius, _, color) if rect.x == control.rect.x && rect.y == control.rect.y
-                && rect.w == control.rect.w && (*radius == 48. || *radius == 28.) && color[3] >= 0.72
+            Draw::Glass(rect, radius, glass) if rect.x == control.rect.x && rect.y == control.rect.y
+                && rect.w == control.rect.w && (*radius == 48. || *radius == 28.) && glass.body == 1.
         )));
         assert!(rendered.draw.iter().any(|draw| matches!(draw,
             Draw::Text(_, rect, style, ..) if rect.x >= control.rect.x && rect.x < control.rect.x + control.rect.w
@@ -2751,7 +2751,8 @@ fn category_focus_active_and_clear_button_share_the_pill_style() {
         .unwrap();
     assert_eq!((clear.rect.w, clear.rect.h), (56., 56.));
     assert!(rendered.draw.iter().any(|draw| matches!(draw,
-        Draw::RoundedGradient(rect, radius, ..) if rect.x == clear.rect.x && rect.y == clear.rect.y && *radius == 28.
+        Draw::Glass(rect, radius, glass) if rect.x == clear.rect.x && rect.y == clear.rect.y && *radius == 28.
+            && glass.tint[0] > 0.9
     )));
     let category = rendered
         .controls
@@ -2765,7 +2766,8 @@ fn category_focus_active_and_clear_button_share_the_pill_style() {
     state.focus = Target::Filter(1);
     let focused = scene(&state);
     assert!(focused.draw.iter().any(|draw| matches!(draw,
-        Draw::RoundedGradient(rect, radius, ..) if rect.x == category.rect.x && rect.y == category.rect.y && *radius == 28.
+        Draw::Glass(rect, radius, glass) if rect.x == category.rect.x && rect.y == category.rect.y && *radius == 28.
+            && glass.tint[0] > 0.9
     )));
 }
 
@@ -3268,4 +3270,108 @@ fn update_card_shows_progress_restores_retry_and_ignores_presses_while_busy() {
     assert_eq!(state.update, InstallStatus::Idle);
     state.install_response(Response::Finished(Ok(())));
     assert_eq!(state.update_status, Status::Unchecked);
+}
+
+#[test]
+fn appearance_toggles_classic_surfaces_and_frost_slider_steps_in_tens() {
+    use crate::renderer::Draw;
+    use crate::state::{APPEARANCE_SETTING, Subpage};
+    let mut state = ready();
+    state.open(2);
+    state.panel_started = None;
+    let glass = |scene: &view::Scene| {
+        scene
+            .draw
+            .iter()
+            .filter(|draw| matches!(draw, Draw::Glass(..)))
+            .count()
+    };
+    assert!(glass(&scene(&state)) > 0);
+    state.focus = Target::Setting(APPEARANCE_SETTING);
+    assert!(state.activate().is_empty());
+    assert_eq!(state.subpage, Some(Subpage::Appearance));
+    assert_eq!(state.focus, Target::Choice(0));
+    state.panel_started = None;
+    // Liquid Glass shows the frost slider beside the choices; Right reaches it.
+    assert!(controls(&state).iter().any(|c| c.target == Target::Frost));
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Frost);
+    assert_eq!(state.preferences.frost, 50);
+    assert_eq!(
+        state.direction(Direction::Up, &controls(&state)),
+        vec![Effect::Save]
+    );
+    assert_eq!(state.preferences.frost, 60);
+    for _ in 0..10 {
+        state.direction(Direction::Down, &controls(&state));
+    }
+    assert_eq!(state.preferences.frost, 0);
+    assert!(
+        state
+            .direction(Direction::Down, &controls(&state))
+            .is_empty()
+    );
+    state.direction(Direction::Left, &controls(&state));
+    assert_eq!(state.focus, Target::Choice(0));
+    // Classic restores the solid surfaces and hides the slider.
+    state.focus = Target::Choice(1);
+    assert_eq!(state.activate(), vec![Effect::Save]);
+    assert!(state.preferences.classic_look);
+    let classic = scene(&state);
+    assert_eq!(glass(&classic), 0);
+    assert!(!classic.controls.iter().any(|c| c.target == Target::Frost));
+    state.direction(Direction::Right, &controls(&state));
+    assert_eq!(state.focus, Target::Choice(1));
+    state.back();
+    assert_eq!(state.focus, Target::Setting(APPEARANCE_SETTING));
+}
+
+#[test]
+fn pointer_near_the_favorites_row_edges_glides_it_and_stops_at_the_ends() {
+    let mut state = ready();
+    let ids: Vec<String> = state
+        .inventory
+        .apps
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert!(ids.len() > 8, "fixture needs a row wider than the screen");
+    state.preferences.favorites = Some(ids);
+    state.open(0);
+    state.pointer = true;
+    let row = controls(&state)
+        .into_iter()
+        .find(|control| matches!(control.target, Target::App(_)))
+        .expect("favorite tiles")
+        .rect;
+    let y = row.y + row.h / 2.;
+    // Mid-screen, or above the row, nothing moves.
+    state.pointer_at = Some((960., y));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    state.pointer_at = Some((1900., row.y - 80.));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    // Near the right edge it glides right, faster closer to the edge.
+    state.pointer_at = Some((1780., y));
+    assert!(state.edge_scroll(&controls(&state), 0.1));
+    let slow = state.home_scroll;
+    state.home_scroll = 0.;
+    state.pointer_at = Some((1915., y));
+    assert!(state.edge_scroll(&controls(&state), 0.1));
+    assert!(state.home_scroll > slow * 2.);
+    // It stops at the last favorite, then glides back from the left edge to the start.
+    for _ in 0..200 {
+        state.edge_scroll(&controls(&state), 0.1);
+    }
+    let end = state.home_scroll;
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    assert_eq!(state.home_scroll, end);
+    state.pointer_at = Some((10., y));
+    for _ in 0..200 {
+        state.edge_scroll(&controls(&state), 0.1);
+    }
+    assert_eq!(state.home_scroll, 0.);
+    // Remote keys hand control back: the pointer no longer scrolls.
+    state.pointer = false;
+    state.pointer_at = Some((1915., y));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
 }

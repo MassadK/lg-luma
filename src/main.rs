@@ -66,6 +66,8 @@ struct Options {
     assets: Option<PathBuf>,
     preferences: Option<PathBuf>,
     screenshot: Option<PathBuf>,
+    /// Desktop preview: save every frame here on a fixed 60 Hz clock, to review motion.
+    record: Option<PathBuf>,
     dump: Option<PathBuf>,
     frames: Option<u64>,
     script: VecDeque<String>,
@@ -137,6 +139,7 @@ impl Options {
                 "--assets" => result.assets = Some(value.into()),
                 "--preferences" => result.preferences = Some(value.into()),
                 "--screenshot" => result.screenshot = Some(value.into()),
+                "--record" => result.record = Some(value.into()),
                 "--dump-state" => result.dump = Some(value.into()),
                 "--resolution" => result.resolution = Some(value.parse()?),
                 "--capture-scale" => {
@@ -504,6 +507,16 @@ fn scripted_click(
     window: &sdl2::video::Window,
     position: &str,
 ) -> Result<(), String> {
+    scripted_pointer(sdl, window, position, true)
+}
+
+/// Desktop scripts: `click:x:y` presses at a logical position; `point:x:y` only moves there.
+fn scripted_pointer(
+    sdl: &sdl2::Sdl,
+    window: &sdl2::video::Window,
+    position: &str,
+    click: bool,
+) -> Result<(), String> {
     let coordinates: Vec<f32> = position
         .split(':')
         .map(|value| value.parse::<f32>().map_err(|e| e.to_string()))
@@ -519,6 +532,18 @@ fn scripted_click(
     let x = (x * scale + (w as f32 - 1920. * scale) / 2.).round() as i32;
     let y = (y * scale + (h as f32 - 1080. * scale) / 2.).round() as i32;
     let events = sdl.event()?;
+    if !click {
+        return events.push_event(Event::MouseMotion {
+            timestamp: 0,
+            window_id: window.id(),
+            which: SCRIPT_POINTER,
+            mousestate: sdl2::mouse::MouseState::from_sdl_state(0),
+            x,
+            y,
+            xrel: 0,
+            yrel: 0,
+        });
+    }
     for event in [
         Event::MouseButtonDown {
             timestamp: 0,
@@ -941,6 +966,8 @@ fn run() -> Result<(), String> {
     let initial_nav = view::navigation(&assets, state.preferences.language);
     let mut pill = initial_nav.items[0].x;
     let mut pill_width = initial_nav.items[0].w;
+    let mut pill_velocity = 0f32;
+    let mut width_velocity = 0f32;
     let mut last_frame = Instant::now();
     let mut last_minute = None;
     let mut frame = 0u64;
@@ -1222,17 +1249,16 @@ fn run() -> Result<(), String> {
         {
             // Window-entry pointer events can arrive after a slow first upload.
             // Bounded scripted captures own input until their final frame; only
-            // their explicitly injected SDL clicks may alter pointer focus.
+            // their explicitly injected SDL clicks and moves may alter pointer focus.
             let script_owns_input = scripted_input
                 && (options.frames.is_some()
                     || options.profile_frames.is_some()
                     || !options.script.is_empty());
             let external_input = match &event {
-                Event::MouseButtonDown { which, .. } | Event::MouseButtonUp { which, .. } => {
-                    *which != SCRIPT_POINTER
-                }
-                Event::MouseMotion { .. }
-                | Event::MouseWheel { .. }
+                Event::MouseButtonDown { which, .. }
+                | Event::MouseButtonUp { which, .. }
+                | Event::MouseMotion { which, .. } => *which != SCRIPT_POINTER,
+                Event::MouseWheel { .. }
                 | Event::KeyDown { .. }
                 | Event::KeyUp { .. }
                 | Event::TextEditing { .. }
@@ -1463,6 +1489,7 @@ fn run() -> Result<(), String> {
                     if state.moving.is_none()
                         && !matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
                 {
+                    state.pointer_at = pointer_position(&window, x, y);
                     let hovered = hit(&scene.controls, &window, x, y, &state);
                     if let Some(target) = hovered.clone() {
                         state.pointer_focus(target);
@@ -1625,6 +1652,8 @@ fn run() -> Result<(), String> {
         {
             if let Some(position) = action.strip_prefix("click:") {
                 scripted_click(&sdl, &window, position)?;
+            } else if let Some(position) = action.strip_prefix("point:") {
+                scripted_pointer(&sdl, &window, position, false)?;
             } else if action == "prewarm" {
                 prewarm_now = true;
             } else {
@@ -1691,20 +1720,61 @@ fn run() -> Result<(), String> {
             }
             text_active = keyboard;
         }
-        let dt = last_frame.elapsed().as_secs_f32().min(0.1);
+        let dt = if options.record.is_some() {
+            // Every frame is drawn and saved, so the recording keeps real-time pacing.
+            state.dirty = true;
+            1. / 60.
+        } else {
+            last_frame.elapsed().as_secs_f32().min(0.1)
+        };
         last_frame = Instant::now();
         let navigation = view::navigation(&assets, state.preferences.language);
         let target = navigation.items[state.page_index()].x;
         let target_width = navigation.items[state.page_index()].w;
-        if state.preferences.reduced_motion
-            || ((pill - target).abs() < 0.2 && (pill_width - target_width).abs() < 0.2)
-        {
+        let settled = (pill - target).abs() < 0.2
+            && (pill_width - target_width).abs() < 0.2
+            && pill_velocity.abs() < 4.
+            && state.nav_lens < 0.005;
+        if state.preferences.reduced_motion || settled {
             pill = target;
             pill_width = target_width;
-        } else {
+            pill_velocity = 0.;
+            width_velocity = 0.;
+            state.nav_lens = 0.;
+            state.nav_stretch = 0.;
+            state.nav_velocity = 0.;
+        } else if state.preferences.classic_look {
             pill += (target - pill) * (1. - (-20. * dt).exp());
             pill_width += (target_width - pill_width) * (1. - (-20. * dt).exp());
             state.dirty = true;
+        } else {
+            // Liquid Glass: a slightly underdamped spring (overshoot, then settle) while the
+            // selection lifts into a clear lens, stretches with its speed and drops back.
+            const STIFFNESS: f32 = 240.;
+            const DAMPING: f32 = 24.;
+            let steps = (dt * 480.).ceil().max(1.);
+            let h = dt / steps;
+            for _ in 0..steps as u32 {
+                pill_velocity += (STIFFNESS * (target - pill) - DAMPING * pill_velocity) * h;
+                pill += pill_velocity * h;
+                width_velocity +=
+                    (STIFFNESS * (target_width - pill_width) - DAMPING * width_velocity) * h;
+                pill_width += width_velocity * h;
+            }
+            let travelling = (target - pill).abs() > 8. || pill_velocity.abs() > 160.;
+            let (goal, rate) = if travelling { (1., 26.) } else { (0., 11.) };
+            state.nav_lens += (goal - state.nav_lens) * (1. - (-rate * dt).exp());
+            state.nav_stretch = (pill_velocity.abs() / 3200.).min(0.22);
+            state.nav_velocity = pill_velocity;
+            state.dirty = true;
+        }
+        state.edge_scrolling = state.edge_scroll(&scene.controls, dt);
+        if state.edge_scrolling
+            && let Some((x, y)) = state.pointer_at
+            && let Some(target) = state.hit_test(&scene.controls, x, y)
+        {
+            // The row slides under a still pointer: hover follows whatever is now beneath it.
+            state.pointer_focus(target);
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible
@@ -1717,6 +1787,13 @@ fn run() -> Result<(), String> {
             let compose_ms = compose_started.elapsed().as_secs_f64() * 1000.;
             let (width, height) = window.drawable_size();
             if width > 0 && height > 0 {
+                if let Some(directory) = &options.record {
+                    renderer.capture(
+                        &scene.draw,
+                        &directory.join(format!("frame-{frame:04}.png")),
+                        options.capture_size.unwrap_or(Size::HD),
+                    )?;
+                }
                 if final_frame && let Some(path) = &options.screenshot {
                     captured = Some(renderer.capture(
                         &scene.draw,
@@ -1867,6 +1944,8 @@ fn run() -> Result<(), String> {
             250
         } else if pill != target
             || pill_width != target_width
+            || state.nav_lens > 0.
+            || state.edge_scrolling
             || state.animating()
             || options.profile_frames.is_some()
         {
