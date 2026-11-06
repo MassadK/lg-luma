@@ -3325,3 +3325,53 @@ fn appearance_toggles_classic_surfaces_and_frost_slider_steps_in_tens() {
     state.back();
     assert_eq!(state.focus, Target::Setting(APPEARANCE_SETTING));
 }
+
+#[test]
+fn pointer_near_the_favorites_row_edges_glides_it_and_stops_at_the_ends() {
+    let mut state = ready();
+    let ids: Vec<String> = state
+        .inventory
+        .apps
+        .iter()
+        .map(|app| app.id.clone())
+        .collect();
+    assert!(ids.len() > 8, "fixture needs a row wider than the screen");
+    state.preferences.favorites = Some(ids);
+    state.open(0);
+    state.pointer = true;
+    let row = controls(&state)
+        .into_iter()
+        .find(|control| matches!(control.target, Target::App(_)))
+        .expect("favorite tiles")
+        .rect;
+    let y = row.y + row.h / 2.;
+    // Mid-screen, or above the row, nothing moves.
+    state.pointer_at = Some((960., y));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    state.pointer_at = Some((1900., row.y - 80.));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    // Near the right edge it glides right, faster closer to the edge.
+    state.pointer_at = Some((1780., y));
+    assert!(state.edge_scroll(&controls(&state), 0.1));
+    let slow = state.home_scroll;
+    state.home_scroll = 0.;
+    state.pointer_at = Some((1915., y));
+    assert!(state.edge_scroll(&controls(&state), 0.1));
+    assert!(state.home_scroll > slow * 2.);
+    // It stops at the last favorite, then glides back from the left edge to the start.
+    for _ in 0..200 {
+        state.edge_scroll(&controls(&state), 0.1);
+    }
+    let end = state.home_scroll;
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+    assert_eq!(state.home_scroll, end);
+    state.pointer_at = Some((10., y));
+    for _ in 0..200 {
+        state.edge_scroll(&controls(&state), 0.1);
+    }
+    assert_eq!(state.home_scroll, 0.);
+    // Remote keys hand control back: the pointer no longer scrolls.
+    state.pointer = false;
+    state.pointer_at = Some((1915., y));
+    assert!(!state.edge_scroll(&controls(&state), 0.1));
+}

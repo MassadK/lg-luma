@@ -25,6 +25,10 @@ pub const HOME_TILE_WIDTH: f32 = 256.;
 pub const HOME_TILE_PITCH: f32 = 281.6;
 pub const HOME_FADE_LEFT: f32 = 8.;
 pub const HOME_FADE_RIGHT: f32 = 1910.;
+/// Magic Remote edge scrolling on the Home favorites row: how far in from either screen edge
+/// the pointer starts gliding the row, and its speed there and at the very edge (px/s).
+pub const HOME_EDGE_ZONE: f32 = 180.;
+pub const HOME_EDGE_SPEED: [f32; 2] = [220., 1500.];
 pub const BACKGROUND_FADE: f32 = 0.4;
 pub const CYCLE_FADE: f32 = 1.6;
 
@@ -244,6 +248,10 @@ pub struct State {
     pub nav_stretch: f32,
     /// Signed horizontal speed of the tab selection, in logical pixels per second.
     pub nav_velocity: f32,
+    /// Last Magic Remote pointer position, in logical pixels.
+    pub pointer_at: Option<(f32, f32)>,
+    /// Whether the favorites row glided under the pointer this frame.
+    pub edge_scrolling: bool,
     pub pointer: bool,
     pub pressed: Option<Target>,
     pub previous_background: Option<(String, Instant)>,
@@ -291,6 +299,8 @@ impl State {
             nav_lens: 0.,
             nav_stretch: 0.,
             nav_velocity: 0.,
+            pointer_at: None,
+            edge_scrolling: false,
             pointer: false,
             pressed: None,
             previous_background: None,
@@ -618,6 +628,48 @@ impl State {
         self.pointer = true;
         self.dirty = true;
         favorites
+    }
+
+    /// Holding the pointer near either end of the Home favorites row glides it that way, slowly
+    /// at the zone's inner edge and fastest at the screen edge, until the row runs out.
+    /// Returns whether the row moved.
+    pub fn edge_scroll(&mut self, controls: &[Control], dt: f32) -> bool {
+        let Some((x, y)) = self.pointer_at else {
+            return false;
+        };
+        if !self.pointer
+            || self.page != Page::Home
+            || self.overlay.is_some()
+            || self.moving.is_some()
+            || self.recents_open()
+        {
+            return false;
+        }
+        let (top, bottom) = controls
+            .iter()
+            .filter(|control| matches!(control.target, Target::App(_)))
+            .fold((f32::MAX, f32::MIN), |(top, bottom), control| {
+                (
+                    top.min(control.rect.y),
+                    bottom.max(control.rect.y + control.rect.h),
+                )
+            });
+        if top > bottom || y < top - 24. || y > bottom + 24. {
+            return false;
+        }
+        let depth = if x > 1920. - HOME_EDGE_ZONE {
+            (x - (1920. - HOME_EDGE_ZONE)) / HOME_EDGE_ZONE
+        } else if x < HOME_EDGE_ZONE {
+            -(HOME_EDGE_ZONE - x) / HOME_EDGE_ZONE
+        } else {
+            return false;
+        };
+        let reach = depth.abs().min(1.);
+        let [slow, fast] = HOME_EDGE_SPEED;
+        let speed = slow + (fast - slow) * reach * reach;
+        let before = self.home_scroll;
+        self.scroll_favorites(depth.signum() * speed * dt);
+        self.home_scroll != before
     }
 
     pub fn scroll_favorites(&mut self, delta: f32) {

@@ -507,6 +507,16 @@ fn scripted_click(
     window: &sdl2::video::Window,
     position: &str,
 ) -> Result<(), String> {
+    scripted_pointer(sdl, window, position, true)
+}
+
+/// Desktop scripts: `click:x:y` presses at a logical position; `point:x:y` only moves there.
+fn scripted_pointer(
+    sdl: &sdl2::Sdl,
+    window: &sdl2::video::Window,
+    position: &str,
+    click: bool,
+) -> Result<(), String> {
     let coordinates: Vec<f32> = position
         .split(':')
         .map(|value| value.parse::<f32>().map_err(|e| e.to_string()))
@@ -522,6 +532,18 @@ fn scripted_click(
     let x = (x * scale + (w as f32 - 1920. * scale) / 2.).round() as i32;
     let y = (y * scale + (h as f32 - 1080. * scale) / 2.).round() as i32;
     let events = sdl.event()?;
+    if !click {
+        return events.push_event(Event::MouseMotion {
+            timestamp: 0,
+            window_id: window.id(),
+            which: SCRIPT_POINTER,
+            mousestate: sdl2::mouse::MouseState::from_sdl_state(0),
+            x,
+            y,
+            xrel: 0,
+            yrel: 0,
+        });
+    }
     for event in [
         Event::MouseButtonDown {
             timestamp: 0,
@@ -1227,17 +1249,16 @@ fn run() -> Result<(), String> {
         {
             // Window-entry pointer events can arrive after a slow first upload.
             // Bounded scripted captures own input until their final frame; only
-            // their explicitly injected SDL clicks may alter pointer focus.
+            // their explicitly injected SDL clicks and moves may alter pointer focus.
             let script_owns_input = scripted_input
                 && (options.frames.is_some()
                     || options.profile_frames.is_some()
                     || !options.script.is_empty());
             let external_input = match &event {
-                Event::MouseButtonDown { which, .. } | Event::MouseButtonUp { which, .. } => {
-                    *which != SCRIPT_POINTER
-                }
-                Event::MouseMotion { .. }
-                | Event::MouseWheel { .. }
+                Event::MouseButtonDown { which, .. }
+                | Event::MouseButtonUp { which, .. }
+                | Event::MouseMotion { which, .. } => *which != SCRIPT_POINTER,
+                Event::MouseWheel { .. }
                 | Event::KeyDown { .. }
                 | Event::KeyUp { .. }
                 | Event::TextEditing { .. }
@@ -1468,6 +1489,7 @@ fn run() -> Result<(), String> {
                     if state.moving.is_none()
                         && !matches!(state.overlay, Some(Overlay::SystemKeyboard)) =>
                 {
+                    state.pointer_at = pointer_position(&window, x, y);
                     let hovered = hit(&scene.controls, &window, x, y, &state);
                     if let Some(target) = hovered.clone() {
                         state.pointer_focus(target);
@@ -1630,6 +1652,8 @@ fn run() -> Result<(), String> {
         {
             if let Some(position) = action.strip_prefix("click:") {
                 scripted_click(&sdl, &window, position)?;
+            } else if let Some(position) = action.strip_prefix("point:") {
+                scripted_pointer(&sdl, &window, position, false)?;
             } else if action == "prewarm" {
                 prewarm_now = true;
             } else {
@@ -1743,6 +1767,14 @@ fn run() -> Result<(), String> {
             state.nav_stretch = (pill_velocity.abs() / 3200.).min(0.22);
             state.nav_velocity = pill_velocity;
             state.dirty = true;
+        }
+        state.edge_scrolling = state.edge_scroll(&scene.controls, dt);
+        if state.edge_scrolling
+            && let Some((x, y)) = state.pointer_at
+            && let Some(target) = state.hit_test(&scene.controls, x, y)
+        {
+            // The row slides under a still pointer: hover follows whatever is now beneath it.
+            state.pointer_focus(target);
         }
         let final_frame = options.frames.is_some_and(|limit| frame + 1 >= limit)
             || (visible
@@ -1913,6 +1945,7 @@ fn run() -> Result<(), String> {
         } else if pill != target
             || pill_width != target_width
             || state.nav_lens > 0.
+            || state.edge_scrolling
             || state.animating()
             || options.profile_frames.is_some()
         {
